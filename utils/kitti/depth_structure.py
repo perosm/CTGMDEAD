@@ -20,10 +20,10 @@ for root_depth_tv in [root_depth_train, root_depth_val]:
             if os.path.isdir(groundtruth_dir):
                 for folder in ["image_02", "image_03"]:
                     source_path = os.path.join(groundtruth_dir, folder)
-                    target_path = os.path.join(drive_dir, folder)
+                    target_path = drive_dir
                     if not os.path.exists(target_path):
                         os.makedirs(target_path)
-                        shutil.move(source_path, target_path)
+                    shutil.move(source_path, target_path)
 
 drives = [
     "2011_09_26",
@@ -54,7 +54,9 @@ if os.path.exists(root_depth_train):
 if os.path.exists(root_depth_val):
     os.rmdir(root_depth_val)
 
-for root, dirs, files in os.walk(new_root_depth):
-    for dir in dirs:
-        if not os.listdir(os.path.join(root, dir)):
-            os.rmdir(os.path.join(root, dir))
+# needs to be ran 2 times because proj_depth/groundtruth
+for i in range(2):
+    for root, dirs, files in os.walk(new_root_depth):
+        for dir in dirs:
+            if not os.listdir(os.path.join(root, dir)):
+                os.rmdir(os.path.join(root, dir))

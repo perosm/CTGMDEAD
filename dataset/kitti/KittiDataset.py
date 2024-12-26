@@ -101,9 +101,10 @@ class KittiDataset(Dataset):
                     )
                     length += len(files)
             paths_dict[key] = sorted(paths_dict[key])
+
         for i in range(0, len(paths_dict["input"]), 5):
-            print(paths_dict["input"][i : i + 5])
-            print(paths_dict["depth"][i : i + 5])
+            print(paths_dict["input"][i])
+            print(paths_dict["depth"][i])
             breakpoint()
 
         print(len(paths_dict["input"]), len(paths_dict["depth"]))
@@ -119,8 +120,8 @@ class KittiDataset(Dataset):
 if __name__ == "__main__":
     kitti_dataset = KittiDataset(
         {
-            "input": "./data/kitti_dataset/input",
-            "depth": "./data/kitti_dataset/depth/train",
+            "input": "./data/kitti/input",
+            "depth": "./data/kitti/depth/train",
         },
         "image_03",
     )
