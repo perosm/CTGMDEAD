@@ -11,6 +11,7 @@ new_root_depth = os.path.join(root_folder, "depth")  # /master-thesis/data/kitti
 moving image_02 & image_03 folders
 from /train/20xx_xx_xx_drive_xxxx_sync/proj_depth/groundtruth
 to   /train/20xx_xx_xx_drive_xxxx_sync
+and adding /data folder to them & moving all files to /data from /[image02 or image03] folder
 """
 for root_depth_tv in [root_depth_train, root_depth_val]:
     if os.path.exists(root_depth_tv):
@@ -21,9 +22,16 @@ for root_depth_tv in [root_depth_train, root_depth_val]:
                 for folder in ["image_02", "image_03"]:
                     source_path = os.path.join(groundtruth_dir, folder)
                     target_path = drive_dir
-                    if not os.path.exists(target_path):
-                        os.makedirs(target_path)
-                    shutil.move(source_path, target_path)
+                    if os.path.exists(target_path):
+                        shutil.move(source_path, target_path)
+                    target_data_path = os.path.join(target_path, folder, "data")
+                    if not os.path.isdir(target_data_path):
+                        os.makedirs(target_data_path)
+                    target_img_folder = os.path.join(target_path, folder)
+                    for item in sorted(os.listdir(target_img_folder)):
+                        shutil.move(
+                            os.path.join(target_img_folder, item), target_data_path
+                        )
 
 drives = [
     "2011_09_26",
@@ -34,8 +42,8 @@ drives = [
 ]
 
 """
-moving data
-from /train/20xx_xx_xx_drive_xxxx_sync/
+moving folders /image02 and /image03
+from /train/20xx_xx_xx_drive_xxxx_sync
 to   /depth/train/20xx_xx_xx/20xx_xx_xx_drive_xxxx_sync
 """
 for drive in sorted(drives):

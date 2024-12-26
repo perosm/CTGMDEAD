@@ -97,9 +97,14 @@ class KittiDataset(Dataset):
             for root_path, dirs, files in os.walk(self.paths[key]):
                 if self.camera in root_path:  # for input and depth
                     paths_dict[key].extend(
-                        sorted([os.path.join(root_path, file) for file in files])
+                        sorted(
+                            [
+                                os.path.join(root_path, file)
+                                for file in files
+                                if file.split(".")[1] == "png"
+                            ]
+                        )
                     )
-                    length += len(files)
             paths_dict[key] = sorted(paths_dict[key])
 
         for i in range(0, len(paths_dict["input"]), 5):
