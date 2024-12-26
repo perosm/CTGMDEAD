@@ -60,7 +60,7 @@ into the same base directory, your folder structure will look like this:
 """
 
 import os
-import torch
+from pathlib import Path
 import sys
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
@@ -80,52 +80,61 @@ class KittiDataset(Dataset):
           - camera: string which represents left camera ('02') or right camera ('03')
           - paths: paths to input data and ground truth for neural networks tasks (e.g. object detection, depth estimation...)
                    paired with the path to the folder where the ground truth for each of the tasks is stored.
-
-        Returns:
-          - None
         """
         # self.transforms = transforms
-        self.paths = paths
+        self.paths = {key: os.path.abspath(paths[key]) for key in paths.keys()}
         self.camera = camera
 
         self._load_data_paths()
+        self._filter_data_paths()
 
     def _load_data_paths(self):
-        length = 0
-        paths_dict = {key: [] for key in self.paths.keys()}
+        self.paths_dict = {key: [] for key in self.paths.keys()}
         for key in self.paths:
             for root_path, dirs, files in os.walk(self.paths[key]):
                 if self.camera in root_path:  # for input and depth
-                    paths_dict[key].extend(
+                    self.paths_dict[key].extend(
                         sorted(
                             [
                                 os.path.join(root_path, file)
                                 for file in files
-                                if file.split(".")[1] == "png"
+                                if file.split(".")[1] in ["png", "jpg"]
                             ]
                         )
                     )
-            paths_dict[key] = sorted(paths_dict[key])
+            self.paths_dict[key] = sorted(self.paths_dict[key])
 
-        for i in range(0, len(paths_dict["input"]), 5):
-            print(paths_dict["input"][i])
-            print(paths_dict["depth"][i])
-            breakpoint()
+    def _filter_data_paths(self):
+        task_root_paths = {
+            task: os.path.abspath(self.paths[task]) for task in self.paths.keys()
+        }
+        task_unique_data = {task: set() for task in self.paths.keys()}
+        for task, paths in self.paths_dict.items():
+            for path in paths:
+                task_unique_data[task].add(path.replace(task_root_paths[task], ""))
 
-        print(len(paths_dict["input"]), len(paths_dict["depth"]))
-        self.length = length
+        final_paths = task_unique_data["input"]
+        for task, unique_data in task_unique_data.items():
+            final_paths = final_paths.intersection(unique_data)
+
+        for task in task_root_paths.keys():
+            self.paths_dict[task] = sorted(
+                [task_root_paths[task] + path for path in final_paths]
+            )
+
+        self.length = len(final_paths)
 
     def __len__(self):
-        return len(self.length)
+        return self.length
 
     def __getitem__(self, index):
-        pass
+        return {self.paths[key][index] for key in self.paths.keys()}
 
 
 if __name__ == "__main__":
     kitti_dataset = KittiDataset(
         {
-            "input": "./data/kitti/input",
+            "input": "./data/kitti/input",  # ../../datasets/kitti_data/
             "depth": "./data/kitti/depth/train",
         },
         "image_03",
