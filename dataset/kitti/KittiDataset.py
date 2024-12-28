@@ -90,28 +90,42 @@ class KittiDataset(Dataset):
 
     def _load_data_paths(self):
         self.paths_dict = {key: [] for key in self.paths.keys()}
-        for key in self.paths:
+        for key in self.paths.keys():
             for root_path, dirs, files in os.walk(self.paths[key]):
                 if self.camera in root_path:  # for input and depth
-                    self.paths_dict[key].extend(
-                        sorted(
-                            [
-                                os.path.join(root_path, file)
-                                for file in files
-                                if file.split(".")[1] in ["png", "jpg"]
-                            ]
+                    if "objdet" in self.paths[key]:
+                        self.paths_dict[key].extend(
+                            sorted(
+                                [
+                                    os.path.join(root_path, file)
+                                    for file in files
+                                    if file.split(".")[1] in ["txt"]
+                                ]
+                            )
                         )
-                    )
+                    else:
+                        self.paths_dict[key].extend(
+                            sorted(
+                                [
+                                    os.path.join(root_path, file)
+                                    for file in files
+                                    if file.split(".")[1] in ["png", "jpg"]
+                                ]
+                            )
+                        )
             self.paths_dict[key] = sorted(self.paths_dict[key])
 
     def _filter_data_paths(self):
         task_root_paths = {
             task: os.path.abspath(self.paths[task]) for task in self.paths.keys()
         }
+        task_extension = {
+            task: self.paths_dict[task][0][-4:] for task in self.paths.keys()
+        }
         task_unique_data = {task: set() for task in self.paths.keys()}
         for task, paths in self.paths_dict.items():
             for path in paths:
-                task_unique_data[task].add(path.replace(task_root_paths[task], ""))
+                task_unique_data[task].add(path.replace(task_root_paths[task], "")[:-4])
 
         final_paths = task_unique_data["input"]
         for task, unique_data in task_unique_data.items():
@@ -119,7 +133,10 @@ class KittiDataset(Dataset):
 
         for task in task_root_paths.keys():
             self.paths_dict[task] = sorted(
-                [task_root_paths[task] + path for path in final_paths]
+                [
+                    task_root_paths[task] + path + task_extension[task]
+                    for path in final_paths
+                ]
             )
 
         self.length = len(final_paths)
@@ -136,6 +153,7 @@ if __name__ == "__main__":
         {
             "input": "./data/kitti/input",  # ../../datasets/kitti_data/
             "depth": "./data/kitti/depth/train",
+            "objdet": "./data/kitti/objdet/train",
         },
-        "image_03",
+        "image_02",
     )
