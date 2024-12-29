@@ -6,94 +6,57 @@ estimate for that pixel). Otherwise, the depth for a pixel can be computed
 in meters by converting the uint16 value to float and dividing it by 256.0:
 disp(u,v)  = ((float)I(u,v))/256.0;
 valid(u,v) = I(u,v)>0;
-
-
-If you unzip all downloaded files from the KITTI vision benchmark website
-into the same base directory, your folder structure will look like this:
-
-|-- devkit
-|-- test_depth_completion_anonymous
-  |-- image
-    |-- 0000000000.png
-    |-- ...
-    |-- 0000000999.png
-  |-- velodyne_raw
-    |-- 0000000000.png
-    |-- ...
-    |-- 0000000999.png
-|-- test_depth_prediction_anonymous
-  |-- image
-    |-- 0000000000.png
-    |-- ...
-    |-- 0000000999.png
-|-- train
-  |-- 2011_xx_xx_drive_xxxx_sync
-    |-- proj_depth
-      |-- groundtruth           # "groundtruth" describes our annotated depth maps
-        |-- image_02            # image_02 is the depth map for the left camera
-          |-- 0000000005.png    # image IDs start at 5 because we accumulate 11 frames
-          |-- ...               # .. which is +-5 around the current frame ;)
-        |-- image_03            # image_02 is the depth map for the right camera
-          |-- 0000000005.png
-          |-- ...
-      |-- velodyne_raw          # this contains projected and temporally unrolled
-        |-- image_02            # raw Velodyne laser scans
-          |-- 0000000005.png
-          |-- ...
-        |-- image_03
-          |-- 0000000005.png
-          |-- ...
-  |-- ... (all drives of all days in the raw KITTI dataset)
-|-- val
-  |-- (same as in train)
-|-- val_selection_cropped       # 1000 images of size 1216x352, cropped and manually
-  |-- groundtruth_depth         # selected frames from from the full validation split
-    |-- 2011_xx_xx_drive_xxxx_sync_groundtruth_depth_xxxxxxxxxx_image_0x.png
-    |-- ...
-  |-- image
-    |-- 2011_xx_xx_drive_xxxx_sync_groundtruth_depth_xxxxxxxxxx_image_0x.png
-    |-- ...
-  |-- velodyne_raw
-    |-- 2011_xx_xx_drive_xxxx_sync_groundtruth_depth_xxxxxxxxxx_image_0x.png
-    |-- ...
-
 """
 
 import os
 from pathlib import Path
-import sys
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
 from typing import Dict, List
+from torch.utils.data import DataLoader
+import utils.kitti.utils as KITTIutils
+import sys
 
 
 class KittiDataset(Dataset):
+
     def __init__(
         self,
-        # transforms: Dict[str, list],
-        paths: Dict[str, str],
-        camera: str = "03",
+        task_paths: Dict[str, str],
+        task_transform: Dict[str, list],
+        camera: str = "02",
     ) -> None:
         """
         Args:
-          - transforms: dictionary of transforms for each of the network tasks.
+          - task_transforms: dictionary of transforms for each of the network tasks.
           - camera: string which represents left camera ('02') or right camera ('03')
           - paths: paths to input data and ground truth for neural networks tasks (e.g. object detection, depth estimation...)
                    paired with the path to the folder where the ground truth for each of the tasks is stored.
         """
-        # self.transforms = transforms
-        self.paths = {key: os.path.abspath(paths[key]) for key in paths.keys()}
+        self.task_transform = self._configure_transforms(
+            KITTIutils.task_tranform_mapping(task_transform)
+        )
+        self.task_paths = {
+            task: os.path.abspath(task_paths[task]) for task in task_paths.keys()
+        }
         self.camera = camera
 
         self._load_data_paths()
         self._filter_data_paths()
 
-    def _load_data_paths(self):
-        self.paths_dict = {key: [] for key in self.paths.keys()}
-        for key in self.paths.keys():
-            for root_path, dirs, files in os.walk(self.paths[key]):
+    def _configure_transforms(
+        self, task_transform: dict
+    ) -> Dict[str, transforms.Compose]:
+        return {
+            task: transforms.Compose(*[task_transform[task]]) for task in task_transform
+        }
+
+    def _load_data_paths(self) -> None:
+        self.paths_dict = {key: [] for key in self.task_paths.keys()}
+        for key in self.task_paths.keys():
+            for root_path, dirs, files in os.walk(self.task_paths[key]):
                 if self.camera in root_path:  # for input and depth
-                    if "objdet" in self.paths[key]:
+                    if "objdet" in self.task_paths[key]:
                         self.paths_dict[key].extend(
                             sorted(
                                 [
@@ -117,12 +80,13 @@ class KittiDataset(Dataset):
 
     def _filter_data_paths(self):
         task_root_paths = {
-            task: os.path.abspath(self.paths[task]) for task in self.paths.keys()
+            task: os.path.abspath(self.task_paths[task])
+            for task in self.task_paths.keys()
         }
         task_extension = {
-            task: self.paths_dict[task][0][-4:] for task in self.paths.keys()
+            task: self.paths_dict[task][0][-4:] for task in self.task_paths.keys()
         }
-        task_unique_data = {task: set() for task in self.paths.keys()}
+        task_unique_data = {task: set() for task in self.task_paths.keys()}
         for task, paths in self.paths_dict.items():
             for path in paths:
                 task_unique_data[task].add(path.replace(task_root_paths[task], "")[:-4])
@@ -141,11 +105,18 @@ class KittiDataset(Dataset):
 
         self.length = len(final_paths)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.length
 
-    def __getitem__(self, index):
-        return {self.paths[key][index] for key in self.paths.keys()}
+    def __getitem__(self, idx):
+        load_functions = KITTIutils.load_utils(list(self.paths_dict.keys()))
+        task_item = dict.fromkeys(self.paths_dict.keys())
+        for task in self.paths_dict.keys():
+            task_item[task] = self.task_transform[task](
+                load_functions[task](self.paths_dict[task][idx])
+            )
+
+        return task_item
 
 
 if __name__ == "__main__":
@@ -155,5 +126,24 @@ if __name__ == "__main__":
             "depth": "./data/kitti/depth/train",
             "objdet": "./data/kitti/objdet/train",
         },
+        {
+            "input": [
+                "ToTensor",
+                "Crop",
+            ],
+            "depth": [
+                "ToTensor",
+                "Crop",
+            ],
+            "objdet": [
+                "ToTensor",
+            ],
+        },
         "image_02",
     )
+
+    train_dataloader = DataLoader(
+        dataset=kitti_dataset, batch_size=1, shuffle=True, num_workers=1
+    )
+    sample = next(iter(train_dataloader))
+    breakpoint()
