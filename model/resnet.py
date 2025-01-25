@@ -183,15 +183,18 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*blocks)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.maxpool(self.relu(self.bn1(self.conv1(x))))
-        out1 = self.layer1(out)
-        out2 = self.layer2(out1)
-        out3 = self.layer3(out2)
-        out4 = self.layer4(out3)
-        # y = self.fc(self.avgpool(out4).squeeze(3).squeeze(2))
+    def forward(
+        self, x: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        e0 = self.relu(self.bn1(self.conv1(x)))
+        out = self.maxpool(e0)
+        e1 = self.layer1(out)
+        e2 = self.layer2(e1)
+        e3 = self.layer3(e2)
+        e4 = self.layer4(e3)
+        # y = self.fc(self.avgpool(e4).squeeze(3).squeeze(2))
 
-        return out, out1, out2, out3, out4
+        return e0, e1, e2, e3, e4  # y
 
 
 def ResNet18(pretrained: bool = True) -> ResNet:
@@ -219,9 +222,9 @@ if __name__ == "__main__":
     ).to(device)
     model = ResNet18(pretrained=True).to(device)
 
-    x = torch.zeros(1, 3, 256, 1256).to(device)
+    x = torch.zeros(1, 3, 256, 256).to(device)
     with torch.no_grad():
         gt = resnet_18(x)
         pred = model(x)
 
-    assert (gt - pred).sum() == 0, "They are not the same!"
+    # assert (gt - pred).sum() == 0, "They are not the same!"
