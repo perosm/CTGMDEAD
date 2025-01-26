@@ -1,3 +1,5 @@
+import os
+
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import Adam
@@ -85,19 +87,22 @@ def train():
             if epoch == 10:
                 freeze_params(model.encoder, False)
 
-            if cnt_print % 100:
+            if cnt_print % 1000:
                 print(f"loss={loss}")
             cnt_print += 1
 
             epoch_loss += loss
 
         losses[epoch] = epoch_loss / len(train_dataloader)
-    # plot_input_and_depth(
-    # data["input"].cpu(), data["depth"].cpu(), pred.detach().cpu() * DEPTH_MAX
-    # )
+        print(f"Epoch loss={losses[epoch]}")
 
-    torch.save(model.state_dict(), "../train_info/run1")
-    with open("../train_info/run1/losses.txt", "w") as f:
+    save_dir = "../train_info/run1"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # Spremanje modela i gubitaka
+    torch.save(model.state_dict(), os.path.join(save_dir, "model.pth"))
+    with open(os.path.join(save_dir, "losses.txt"), "w") as f:
         f.writelines(losses)
 
 
