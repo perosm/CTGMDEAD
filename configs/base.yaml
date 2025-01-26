@@ -1,14 +1,21 @@
 dataset:
   task_transform:
     input: 
-      - ToTensor
       - Crop
     depth: 
-      - ToTensor
       - Crop
-    objdet:
-      - ToTensor
   task_paths:
     input: "./data/kitti/input"
     depth: "./data/kitti/depth/train"
-    objdet: "./data/kitti/objdet/train"
+
+model: 
+  encoder: ResNet18
+  decoder: UnetDecoder
+
+loss:
+  depth: 
+    - MAE
+
+metrics:
+  depth:
+    - MAE

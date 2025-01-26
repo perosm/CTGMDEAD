@@ -12,7 +12,7 @@ class DepthEncoderDecoder(nn.Module):
 
     def forward(self, x) -> torch.Tensor:
         e0, e1, e2, e3, e4 = self.encoder(x)
-        out = self.decoder(e4, e3, e2, e1, e0)
+        out = self.decoder(e0, e1, e2, e3, e4)
 
         return out
 

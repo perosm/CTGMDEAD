@@ -1,13 +1,3 @@
-"""
-Depth maps (annotated and raw Velodyne scans) are saved as uint16 PNG images.
-A 0 value indicates an invalid pixel
-(ie, no ground truth exists, or the estimation algorithm didn't produce an
-estimate for that pixel). Otherwise, the depth for a pixel can be computed
-in meters by converting the uint16 value to float and dividing it by 256.0:
-disp(u,v)  = ((float)I(u,v))/256.0;
-valid(u,v) = I(u,v)>0;
-"""
-
 import os
 from pathlib import Path
 from torch.utils.data.dataset import Dataset
@@ -124,20 +114,20 @@ if __name__ == "__main__":
         {
             "input": "./data/kitti/input",  # ../../datasets/kitti_data/
             "depth": "./data/kitti/depth/train",
-            "objdet": "./data/kitti/objdet/train",
+            # "objdet": "./data/kitti/objdet/train",
         },
         {
             "input": [
-                "ToTensor",
+                # "ToTensor",
                 "Crop",
             ],
             "depth": [
-                "ToTensor",
+                # "ToTensor",
                 "Crop",
             ],
-            "objdet": [
-                "ToTensor",
-            ],
+            # "objdet": [
+            #     "ToTensor",
+            # ],
         },
         "image_02",
     )

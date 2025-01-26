@@ -1,9 +1,20 @@
 from typing import Dict
 import numpy as np
 import torch
+from torch import nn
+import torchvision
 from torchvision import transforms
+
 import torchvision.transforms.functional as F
 import cv2
+import re
+
+from model.resnet import ResNet18
+from model.decoder import UnetDecoder
+from model.encoder_decoder import DepthEncoderDecoder
+
+KITTI_H, KITTI_W = 375, 1242
+NEW_H, NEW_W = 256, 1184
 
 
 ############################## DATA LOAD UTILS ##############################
@@ -13,7 +24,7 @@ def input_load_util():
     """
 
     def func(png_file_path):
-        return cv2.imread(png_file_path, cv2.IMREAD_COLOR) / 256.0
+        return torchvision.io.read_image(png_file_path).to(torch.float32)
 
     return func
 
@@ -24,9 +35,10 @@ def depth_load_util():
     """
 
     def func(png_file_path):
-        return (
-            cv2.imread(png_file_path, cv2.IMREAD_GRAYSCALE).astype(np.float32) / 256.0
-        )
+        return torch.from_numpy(
+            cv2.imread(png_file_path, cv2.IMREAD_UNCHANGED).astype(np.float32)
+            / 256.0  # maybe https://pytorch.org/vision/master/generated/torchvision.io.decode_image.html#torchvision.io.decode_image?
+        ).unsqueeze(0)
 
     return func
 
@@ -55,7 +67,7 @@ def objdet_load_util():
         with open(txt_file_path, "r") as file:
             lines = file.readlines()
         NUM_DETECTIONS = len(lines)
-        y = np.zeros(shape=(NUM_DETECTIONS, OBJDET_LABEL_SHAPE))
+        y = torch.zeros(shape=(NUM_DETECTIONS, OBJDET_LABEL_SHAPE))
         for i in range(len(lines)):
             elements = lines[i].split(" ")
             type = objdet_class_mapping[elements[0]]
@@ -63,7 +75,7 @@ def objdet_load_util():
             top = float(elements[5])
             right = float(elements[6])
             bottom = float(elements[7])
-            y[i] = np.array([type, left, top, right, bottom])
+            y[i] = torch.Tensor([type, left, top, right, bottom])
 
         return y
 
@@ -84,16 +96,14 @@ def load_utils(tasks: list[str]) -> dict:
 
 ############################## TRANSFORM UTILS ##############################
 class CropImage(object):
-    def __init__(
-        self, top: int = 23, left: int = 13, height: int = 352, width: int = 1216
-    ) -> None:
+    def __init__(self) -> None:
         """
         Mimics https://pytorch.org/vision/main/generated/torchvision.transforms.functional.crop.html
         """
-        self.top = top
-        self.left = left
-        self.height = height
-        self.width = width
+        self.top = KITTI_H - NEW_H
+        self.left = (KITTI_W - NEW_W) // 2
+        self.height = NEW_H
+        self.width = NEW_W
 
     def __call__(self, img: torch.Tensor) -> torch.Tensor:
         return F.crop(img, self.top, self.left, self.height, self.width)
@@ -102,6 +112,7 @@ class CropImage(object):
 def task_tranform_mapping(task_transforms_str: Dict[str, str]) -> Dict[str, list]:
     """
     Pairs strings from .yaml file to torch transforms accordingly.
+
     Args:
         - task_transforms_str: dictionary which pairs each task to its corresponding data transforms.
     """
@@ -115,3 +126,73 @@ def task_tranform_mapping(task_transforms_str: Dict[str, str]) -> Dict[str, list
             task_transforms[task].append(transforms_dict[transform_str])
 
     return task_transforms
+
+
+############################## MODEL UTILS ##############################
+def print_model_size(model: nn.Module) -> None:
+    """
+    Returns size of model in megabytes.
+
+    Args:
+        - model (nn.Module): pytorch model which size we wish to know.
+
+    """
+    param_size = 0
+    for param in model.parameters():
+        param_size += param.nelement() * param.element_size()
+
+    buffer_size = 0
+    for buffer in model.buffers():
+        buffer_size += buffer.nelement() * buffer.element_size()
+
+    size_in_mb = (param_size + buffer_size) / 1024**2
+
+    print(f"model size: {size_in_mb:.3f}MB")
+
+
+def freeze_params(
+    model: nn.Module, freeze=True, layers: Dict[str, list[str]] = {"*": ["*"]}
+) -> nn.Module:
+    """
+    Freezes all layers defined in the layers dict.
+    By default we all layers are frozen.
+
+    Args:
+     - model (nn.Module): model whose layers are to be freezed
+     - freeze (bool): freeze flag. If true freezes given layers. If false unfreezes given layers.
+     - layers (Dict[str, List[str]]): dictionary whose keys represent top level building blocks
+                                      and whose values represent lower level components such as
+                                      convolutions, batchnorm etc...
+
+    Returns:
+     - model (nn.Module): model with frozen/unfrozen layers.
+    """
+    pattern = None
+    for layer_name, sublayer_names in layers.items():
+        layer_pattern = re.sub(r"\*", r".*", layer_name)
+        for sublayer_name in sublayer_names:
+            if sublayer_name == "*":
+                pattern = layer_pattern
+            else:
+                sublayer_pattern = re.sub(r"\*", ".*", sublayer_name)
+                pattern = f"{layer_pattern}.*{sublayer_pattern}"
+            for name, param in model.named_parameters():
+                if re.search(pattern, name, re.DOTALL):
+                    print(f"{name}" + (" frozen!" if freeze else " unfrozen!"))
+                    param.requires_grad = False if freeze else True
+
+    return model
+
+
+############################## TRAIN UTILS ##############################
+def config_model(model_configs):
+    pass
+
+
+def config_loss(loss_configs):
+    pass
+
+
+############################## TEST UTILS ##############################
+def config_metrics(metric_configs):
+    pass

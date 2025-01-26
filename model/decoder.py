@@ -62,8 +62,8 @@ class UnetDecoder(nn.Module):
             in_channels // channel_scale_factors[3], out_channels, kernel_size=1
         )
 
-    def forward(self, x, e3, e2, e1, e0) -> torch.Tensor:
-        x = self.layer1(x, e3)
+    def forward(self, e0, e1, e2, e3, e4) -> torch.Tensor:
+        x = self.layer1(e4, e3)
         x = self.layer2(x, e2)
         x = self.layer3(x, e1)
         x = self.layer4(x, e0)
