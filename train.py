@@ -43,7 +43,7 @@ def plot_input_and_depth(image, depth, pred):
 
 def train():
     device = "cuda"
-    dataset = KittiDataset(
+    dataset = KittiDataset(  # ../../datasets/kitti_data
         task_paths={"input": "./data/kitti/input", "depth": "./data/kitti/depth/train"},
         task_transform={
             "input": [
@@ -60,6 +60,7 @@ def train():
     )
     encoder = ResNet18()
     decoder = UnetDecoder()
+
     model = DepthEncoderDecoder(encoder=encoder, decoder=decoder).to(device)
     print_model_size(model)
     freeze_params(model.encoder, True)
@@ -93,7 +94,7 @@ def train():
 
             epoch_loss += loss
 
-        losses[epoch] = epoch_loss / len(train_dataloader)
+        losses[epoch] = str(epoch_loss / len(train_dataloader))
         print(f"Epoch loss={losses[epoch]}")
 
     save_dir = "../train_info/run1"
