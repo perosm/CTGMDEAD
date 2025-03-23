@@ -1,0 +1,56 @@
+name: 00_ResNet18_epoch20
+device: cuda
+dataset:
+  dataset_name: KittiDataset
+  task_transform:
+    input: 
+      - Crop
+    depth: 
+      - Crop
+  task_paths:
+    input: "./data/kitti/input"
+    depth: "./data/kitti/depth/train"
+
+dataloader:
+  batch_size: 2
+  shuffle: True
+  num_workers: 1
+
+model:
+  encoder:
+    name: ResNet18
+    pretrained: True
+    freeze_epoch: 0
+    unfreeze_epoch: 10
+  decoder:
+    depth:
+      name: UnetDecoder
+      in_channels: 512
+      channel_scale_factors: [2, 4, 8, 8]
+      out_channels: 1
+      freeze_epoch: None
+      unfreeze_epoch: None
+    # semantic_segmentations:
+    #   name: UnetDecoder
+    #   in_channels: 512
+    #   channel_scale_factors: [2, 4, 8, 8]
+    #   out_channels: 1
+    #   freeze_epoch: 0
+    #   unfreeze_epoch: 10
+
+
+loss:
+  depth: 
+     - MaskedMAE
+
+optimizer:
+  name: Adam
+  lr: 1e-4
+
+epochs: 20
+
+metrics:
+  depth:
+    - MaskedMAE
+
+save_path: ../run_info/

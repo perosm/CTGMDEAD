@@ -1,20 +1,22 @@
 import os
 
 import torch
-from torch.utils.data import DataLoader
-from torch.optim import Adam
+import logging
 import matplotlib.pyplot as plt
+import pprint
+from utils.LossAggregator import LossAggregator
 from tqdm import tqdm
 
-from dataset.kitti.KittiDataset import KittiDataset
-from model.resnet import ResNet18
-from model.decoder import UnetDecoder
-from model.encoder_decoder import DepthEncoderDecoder
-from utils.losses import MaskedMAE, GradLoss
 
-from utils.kitti.utils import freeze_params, print_model_size
-
-DEPTH_MAX = 90.0
+from utils.kitti.utils import (
+    prepare_save_directories,
+    configure_dataset,
+    configure_dataloader,
+    configure_model,
+    freeze_model,
+    configure_optimizer,
+    configure_loss,
+)
 
 
 def plot_input_and_depth(image, depth, pred):
@@ -41,70 +43,44 @@ def plot_input_and_depth(image, depth, pred):
     plt.show()
 
 
-def train():
-    device = "cuda"
-    dataset = KittiDataset(  # ../../datasets/kitti_data
-        task_paths={"input": "./data/kitti/input", "depth": "./data/kitti/depth/train"},
-        task_transform={
-            "input": [
-                "Crop",
-            ],
-            "depth": [
-                "Crop",
-            ],
-        },
-        camera="image_02",
+def train(args: dict):
+    logger = logging.getLogger(__name__)
+    save_dir = prepare_save_directories(args, "train")
+    logging.basicConfig(
+        filename=save_dir / "train.log", encoding="utf-8", level=logging.INFO
     )
-    train_dataloader = DataLoader(
-        dataset=dataset, batch_size=2, shuffle=True, num_workers=1
-    )
-    encoder = ResNet18()
-    decoder = UnetDecoder()
 
-    model = DepthEncoderDecoder(encoder=encoder, decoder=decoder).to(device)
-    print_model_size(model)
-    freeze_params(model.encoder, True)
-    masked_mae = MaskedMAE()
-    # grad_loss = GradLoss(device)
-    optimizer = Adam(model.parameters(), lr=1e-4)
+    device = args["device"]
+    dataset = configure_dataset(args["dataset"])
+    train_dataloader = configure_dataloader(args["dataloader"], dataset)
+
+    model = configure_model(args["model"]).to(device)
+    losses = configure_loss(args["loss"])
+    optimizer = configure_optimizer(model, args["optimizer"])
+    epochs = args["epochs"]
+    freeze_model(model, args["model"], True, 0)
+    model.train()
+    loss_aggregator = LossAggregator(losses.task_losses)
 
     data = next(iter(train_dataloader))
-
-    epochs = 1
-    model.train()
-    losses = {}
-    cnt_print = 0
     for epoch in range(epochs):
         epoch_loss = 0.0
-        for data in tqdm(train_dataloader, f"Epoch {epoch}"):
-            pred = model(data["input"].to(device))
-            loss = 1 * masked_mae(
-                torch.clamp(pred * DEPTH_MAX, 0, DEPTH_MAX), data["depth"].to(device)
-            )  # + 1 * grad_loss(pred * DEPTH_MAX, gt)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+        task_epoch_loss = {task: 0.0 for task in losses.task_losses.keys()}
+        freeze_model(model, args["model"], False, epoch)
+        # for data in tqdm(train_dataloader, f"Epoch {epoch}"):
+        data = {task: data[task].to(device) for task in data.keys()}
+        pred = model(data["input"])
+        loss, per_task_losses = losses(pred, data)
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
 
-            if epoch == 10:
-                freeze_params(model.encoder, False)
-
-            if cnt_print % 1000:
-                print(f"loss={loss}")
-            cnt_print += 1
-
-            epoch_loss += loss
-
-        losses[epoch] = str(epoch_loss / len(train_dataloader))
-        print(f"Epoch loss={losses[epoch]}")
-
-    save_dir = "../train_info/run1"
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+        epoch_loss += loss
 
     # Spremanje modela i gubitaka
-    torch.save(model.state_dict(), os.path.join(save_dir, "model.pth"))
-    with open(os.path.join(save_dir, "losses.txt"), "w") as f:
-        f.writelines(losses)
+    torch.save(model.state_dict(), save_dir / "model.pth")
+
+    return
 
 
 if __name__ == "__main__":

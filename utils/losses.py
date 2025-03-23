@@ -3,20 +3,41 @@ from torch import nn
 import torch.nn.functional as F
 
 
+class MultiTaskLoss(nn.Module):
+    def __init__(self, task_losses: dict[str, list[nn.Module]]):
+        super().__init__()
+        self.task_losses = task_losses
+
+    def forward(
+        self, pred: dict[str, torch.Tensor], gt: dict[str, torch.Tensor]
+    ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+        total_loss = 0.0
+        per_task_losses = {
+            task: [] for task in self.task_losses.keys()
+        }  # used to keep track of losses per task
+        for task, losses in self.task_losses.items():
+            for loss in losses:
+                per_task_losses[task].append(loss(pred[task], gt[task]))
+                total_loss += per_task_losses[task][-1]
+
+        return total_loss, per_task_losses
+
+
 class MaskedMAE(nn.Module):
-    def __init__(self):
+    def __init__(self, device="cuda"):
         super().__init__()
         self._l1_loss = nn.L1Loss(reduction="none")
+        self.device = device
 
     def forward(self, pred, gt):
-        mask = torch.where(gt != 0, 1, 0)
+        mask = torch.where(gt != 0, 1, 0).to(self.device)
         valid_points = mask.sum()
         loss = self._l1_loss(pred * mask, gt).sum((2, 3)) / valid_points
         return loss.mean()
 
 
 class GradLoss(nn.Module):
-    def __init__(self, device):
+    def __init__(self, device="cuda"):
         super().__init__()
         sobel_x = (
             torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32)

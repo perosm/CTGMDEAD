@@ -3,6 +3,8 @@ import json
 
 import numpy as np
 import torch
+from torch import nn
+from torch.utils.data.dataset import Dataset
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -16,6 +18,7 @@ from utils.metrics import (
     MaskedAverageRelativeError,
     MaskedRMSE,
     MaskedThresholdAccracy,
+    MaskedMeanAbsoluteError,
 )
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -37,24 +40,25 @@ def plot_input_and_depth(image, depth, pred, save_path, metric, worst_idx):
         figsize=(36, 24),
         subplot_kw={"aspect": "equal"},
     )
-    fig.subplots_adjust(top=0.95, bottom=0.05, left=0.1, right=0.9, hspace=0.4)
+    fig.subplots_adjust(top=0.95, bottom=0.05, left=0.1, right=0.9, hspace=0.0)
 
     im0 = axes[0].imshow(image_np)
     axes[0].axis("off")
+    # plt.colorbar(im0, ax=axes[0], pad=10, shrink=1, aspect=11)
 
     im1 = axes[1].imshow(depth_np, cmap="viridis", vmin=vmin, vmax=vmax)
     axes[1].axis("off")
 
     im2 = axes[2].imshow(pred_np, cmap="viridis", vmin=vmin, vmax=vmax)
     axes[2].axis("off")
-    plt.colorbar(im1, ax=[axes[1], axes[2]], pad=0.01)
+    plt.colorbar(im1, ax=[axes[1], axes[2]], pad=0.01, shrink=0.9)
 
     dmin = np.min(diff_np)
     dmax = np.max(diff_np)
     norm = mcolors.TwoSlopeNorm(vmin=dmin, vcenter=0, vmax=dmax)
     im3 = axes[3].imshow(diff_np, cmap="seismic", norm=norm)
     axes[3].axis("off")
-    plt.colorbar(im3, ax=axes[3], pad=0.01, shrink=1.5, aspect=12)
+    plt.colorbar(im3, ax=axes[3], pad=0.01, shrink=1, aspect=11)
 
     if not os.path.exists(f"{save_path}/{metric}"):
         os.makedirs(f"{save_path}/{metric}")
@@ -62,16 +66,17 @@ def plot_input_and_depth(image, depth, pred, save_path, metric, worst_idx):
 
 
 def save_n_worst_frames_per_metric(
-    model,
+    model: nn.Module,
+    dataset: Dataset,
     n_worst_frames_per_metric: dict[str, tuple[torch.Tensor, ...]],
     save_path: str,
 ):
     model.eval()
     for metric in n_worst_frames_per_metric.keys():
         worst_cnt = 0
-        for frame in n_worst_frames_per_metric[metric]:
-            x = frame["input"].unsqueeze(0)
-            y = frame["depth"].unsqueeze(0)
+        for frame_idx in n_worst_frames_per_metric[metric]:
+            x = dataset[frame_idx]["input"].unsqueeze(0)
+            y = dataset[frame_idx]["depth"].unsqueeze(0)
             with torch.no_grad():
                 y_pred = model(x.to(DEVICE))
                 plot_input_and_depth(
@@ -103,9 +108,14 @@ def eval():
     model.load_state_dict(torch.load("../run1/model.pth"))
     model.eval()
 
-    metrics = [MaskedAverageRelativeError(), MaskedRMSE(), MaskedThresholdAccracy()]
+    metrics = [
+        MaskedAverageRelativeError(),
+        MaskedRMSE(),
+        MaskedThresholdAccracy(),
+        MaskedMeanAbsoluteError(),
+    ]
     metric_values = {metric.__class__.__name__: [] for metric in metrics}
-
+    # cnt = 0
     for data in tqdm(eval_dataloader, "Eval..."):
         with torch.no_grad():
             pred = model(data["input"].to(DEVICE))
@@ -113,6 +123,9 @@ def eval():
                 metric_values[metric.__class__.__name__].append(
                     metric(pred * DEPTH_MAX, data["depth"].to(DEVICE))
                 )
+        # if cnt != 0 and cnt % 4 == 0:
+        #     break
+        # cnt += 1
 
     save_dir = "../train_info/run1"
     if not os.path.exists(save_dir):
@@ -127,9 +140,9 @@ def eval():
             sorted=True,
         )
         worst_n_frames_per_metrics[metric.__class__.__name__].extend(
-            [dataset[index] for index in indices]
+            [index.item() for index in indices]
         )
-    save_n_worst_frames_per_metric(model, worst_n_frames_per_metrics, save_dir)
+    save_n_worst_frames_per_metric(model, dataset, worst_n_frames_per_metrics, save_dir)
     metrics = {
         metric.__class__.__name__: sum(metric_values[metric.__class__.__name__])
         / len(metric_values[metric.__class__.__name__])

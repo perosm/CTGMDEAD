@@ -1,134 +1,83 @@
-from typing import Dict
-import numpy as np
+import os
+import re
+import pathlib
+
 import torch
 from torch import nn
-import torchvision
-from torchvision import transforms
-
+from torch.utils.data import DataLoader
+from torch.utils.data.dataset import Dataset
+from torch.optim import Optimizer, Adam
 import torchvision.transforms.functional as F
-import cv2
-import re
 
-from model.resnet import ResNet18
+
+from dataset.kitti.KittiDataset import KittiDataset
+from model.resnet import ResNet18, ResNet
 from model.decoder import UnetDecoder
-from model.encoder_decoder import DepthEncoderDecoder
-
-KITTI_H, KITTI_W = 375, 1242
-NEW_H, NEW_W = 256, 1184
+from model.multi_task_network import MultiTaskNetwork
+from utils.losses import GradLoss, MaskedMAE, MultiTaskLoss
 
 
-############################## DATA LOAD UTILS ##############################
-def input_load_util():
-    """
-    Used to return the function that will load the input data.
-    """
+def prepare_save_directories(args: dict, subfolder_name="train") -> None:
+    save_dir = pathlib.Path(
+        os.path.join(args["save_path"], args["save_path"], subfolder_name)
+    )
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
-    def func(png_file_path):
-        return torchvision.io.read_image(png_file_path).to(torch.float32)
-
-    return func
+    return save_dir
 
 
-def depth_load_util():
-    """
-    Used to return the function that will load the depth data.
-    """
-
-    def func(png_file_path):
-        return torch.from_numpy(
-            cv2.imread(png_file_path, cv2.IMREAD_UNCHANGED).astype(np.float32)
-            / 256.0  # maybe https://pytorch.org/vision/master/generated/torchvision.io.decode_image.html#torchvision.io.decode_image?
-        ).unsqueeze(0)
-
-    return func
-
-
-# TODO: finish for objdet
-OBJDET_LABEL_SHAPE = 5  # (type, x1, y1, x2, y2)
-objdet_class_mapping = {
-    "Car": 0,
-    "Van": 1,
-    "Truck": 2,
-    "Pedestrian": 3,
-    "Person_sitting": 4,
-    "Cyclist": 5,
-    "Tram": 6,
-    "Misc": 7,
-    "DontCare": 8,
-}
-
-
-def objdet_load_util():
-    """
-    Used to return the function that will load the object detection labels accordingly.
-    """
-
-    def func(txt_file_path):
-        with open(txt_file_path, "r") as file:
-            lines = file.readlines()
-        NUM_DETECTIONS = len(lines)
-        y = torch.zeros(shape=(NUM_DETECTIONS, OBJDET_LABEL_SHAPE))
-        for i in range(len(lines)):
-            elements = lines[i].split(" ")
-            type = objdet_class_mapping[elements[0]]
-            left = float(elements[4])
-            top = float(elements[5])
-            right = float(elements[6])
-            bottom = float(elements[7])
-            y[i] = torch.Tensor([type, left, top, right, bottom])
-
-        return y
-
-    return func
-
-
-def load_utils(tasks: list[str]) -> dict:
-    """
-    For given tasks returns utility functions to accordingly load the data.
-    """
-    task_load_type = {
-        "input": input_load_util(),
-        "depth": depth_load_util(),
-        "objdet": objdet_load_util(),
+############################## CONFIG UTILS ##############################
+def configure_dataset(dataset_configs: dict[str, str | list]) -> Dataset:
+    dataset_dict = {
+        KittiDataset.__name__: KittiDataset(
+            dataset_configs["task_paths"], dataset_configs["task_transform"]
+        )
     }
-    return {task: task_load_type[task] for task in tasks}
+    return dataset_dict[dataset_configs["dataset_name"]]
 
 
-############################## TRANSFORM UTILS ##############################
-class CropImage(object):
-    def __init__(self) -> None:
-        """
-        Mimics https://pytorch.org/vision/main/generated/torchvision.transforms.functional.crop.html
-        """
-        self.top = KITTI_H - NEW_H
-        self.left = (KITTI_W - NEW_W) // 2
-        self.height = NEW_H
-        self.width = NEW_W
-
-    def __call__(self, img: torch.Tensor) -> torch.Tensor:
-        return F.crop(img, self.top, self.left, self.height, self.width)
-
-
-def task_tranform_mapping(task_transforms_str: Dict[str, str]) -> Dict[str, list]:
-    """
-    Pairs strings from .yaml file to torch transforms accordingly.
-
-    Args:
-        - task_transforms_str: dictionary which pairs each task to its corresponding data transforms.
-    """
-    transforms_dict = {
-        "Crop": CropImage(),
-        "ToTensor": transforms.ToTensor(),
-    }
-    task_transforms = {task: [] for task in task_transforms_str.keys()}
-    for task in task_transforms_str.keys():
-        for transform_str in task_transforms_str[task]:
-            task_transforms[task].append(transforms_dict[transform_str])
-
-    return task_transforms
+def configure_dataloader(
+    dataloader_configs: dict[str, str | bool], dataset: Dataset
+) -> DataLoader:
+    return DataLoader(
+        dataset=dataset,
+        batch_size=dataloader_configs["batch_size"],
+        shuffle=dataloader_configs["shuffle"],
+        num_workers=dataloader_configs["num_workers"],
+    )
 
 
 ############################## MODEL UTILS ##############################
+def configure_model(model_configs: dict) -> nn.Module:
+    encoder = _configure_encoder(model_configs["encoder"])
+    decoders = _configure_decoder(model_configs["decoder"])
+    model = MultiTaskNetwork(encoder, decoders)
+    print_model_size(model)
+
+    return model
+
+
+def _configure_encoder(encoder_configs: dict) -> nn.Module:
+    encoder_dict = {f"{ResNet.__name__}18": ResNet18(encoder_configs["pretrained"])}
+
+    return encoder_dict[encoder_configs["name"]]
+
+
+def _configure_decoder(decoder_configs: dict) -> nn.Module:
+    decoder_task = {}
+    decoder_dict = {UnetDecoder.__name__: UnetDecoder}
+    for task in decoder_configs.keys():
+        decoder_task_configs = decoder_configs[task]
+        decoder_task[task] = decoder_dict[decoder_task_configs["name"]](
+            decoder_task_configs["in_channels"],
+            decoder_task_configs["channel_scale_factors"],
+            decoder_task_configs["out_channels"],
+        )
+
+    return decoder_task
+
+
 def print_model_size(model: nn.Module) -> None:
     """
     Returns size of model in megabytes.
@@ -150,9 +99,21 @@ def print_model_size(model: nn.Module) -> None:
     print(f"model size: {size_in_mb:.3f}MB")
 
 
+def freeze_model(
+    model: MultiTaskNetwork, model_configs: dict, freeze: bool, epoch: int = 0
+) -> None:
+    command = "freeze_epoch" if freeze else "unfreeze_epoch"
+    if model_configs["encoder"][command] == epoch:
+        freeze_params(model.encoder, freeze)
+
+    for task in model_configs["decoder"].keys():
+        if model_configs["decoder"][task][command] == epoch:
+            freeze_params(model.decoders[task], freeze)
+
+
 def freeze_params(
-    model: nn.Module, freeze=True, layers: Dict[str, list[str]] = {"*": ["*"]}
-) -> nn.Module:
+    model: nn.Module, freeze=True, layers: dict[str, list[str]] = {"*": ["*"]}
+) -> None:
     """
     Freezes all layers defined in the layers dict.
     By default we all layers are frozen.
@@ -181,18 +142,26 @@ def freeze_params(
                     print(f"{name}" + (" frozen!" if freeze else " unfrozen!"))
                     param.requires_grad = False if freeze else True
 
-    return model
-
 
 ############################## TRAIN UTILS ##############################
-def config_model(model_configs):
-    pass
+def configure_loss(loss_configs: dict) -> MultiTaskLoss:
+    loss_dict = {MaskedMAE.__name__: MaskedMAE(), GradLoss.__name__: GradLoss()}
+    task_losses = {task: [] for task in loss_configs.keys()}
+    for task in loss_configs.keys():
+        for loss_name in loss_configs[task]:
+            task_losses[task].append(loss_dict[loss_name])
+
+    return MultiTaskLoss(task_losses)
 
 
-def config_loss(loss_configs):
-    pass
+def configure_optimizer(model: nn.Module, optimizer_configs: dict) -> Optimizer:
+    optimizer_dict = {Adam.__name__: Adam}
+
+    return optimizer_dict[optimizer_configs["name"]](
+        model.parameters(), float(optimizer_configs["lr"])
+    )
 
 
 ############################## TEST UTILS ##############################
-def config_metrics(metric_configs):
+def configure_metrics(metric_configs):
     pass

@@ -4,7 +4,7 @@ from torch.utils.data.dataset import Dataset
 from torchvision import transforms
 from typing import Dict, List
 from torch.utils.data import DataLoader
-import utils.kitti.utils as KITTIutils
+import dataset.dataset_utils as KITTIutils
 import sys
 
 
@@ -94,6 +94,13 @@ class KittiDataset(Dataset):
             )
 
         self.length = len(final_paths)
+
+    def get_item_name(self, idx):
+        task_item = dict.fromkeys(self.paths_dict.keys())
+        for task in self.paths_dict.keys():
+            task_item[task] = self.paths_dict[task][idx]
+
+        return task_item
 
     def __len__(self) -> int:
         return self.length

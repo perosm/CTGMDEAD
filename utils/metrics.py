@@ -65,3 +65,18 @@ class MaskedThresholdAccracy(nn.Module):
         )
 
         return masked_threshold_accuracy.cpu().item()
+
+
+class MaskedMeanAbsoluteError(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # used for picking N worst frames
+        # lower MaskedMAE = better -> False
+        self.higher = False
+
+    def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
+        mask = torch.where(gt != 0, 1, 0).to(DEVICE)
+        valid_points = mask.sum()
+        masked_mae = (torch.abs((mask * pred - gt)).sum((2, 3)) / valid_points).mean()
+
+        return masked_mae.cpu().item()
