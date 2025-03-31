@@ -66,6 +66,7 @@ class KittiDataset(Dataset):
                                 ]
                             )
                         )
+
             self.paths_dict[key] = sorted(self.paths_dict[key])
 
     def _filter_data_paths(self):
@@ -73,6 +74,9 @@ class KittiDataset(Dataset):
             task: os.path.abspath(self.task_paths[task])
             for task in self.task_paths.keys()
         }
+        for task in self.task_paths.keys():
+            breakpoint()
+            print(task, self.paths_dict[task][0][-4:])
         task_extension = {
             task: self.paths_dict[task][0][-4:] for task in self.task_paths.keys()
         }

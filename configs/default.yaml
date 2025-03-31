@@ -7,12 +7,12 @@ dataset:
       - Crop
     depth:
       - Crop
-    semantic_segmentation:
+    road_detection:
       - Crop
   task_paths:
     input: "./data/kitti/input"
     depth: "./data/kitti/depth/train"
-    semantic_segmentation: "./data/kitti/semantic_segmentation/train"
+    road_detection: "./data/kitti/road_detection/training"
 
 train:
   dataloader:
@@ -44,7 +44,7 @@ model:
       out_channels: 1
       freeze_epoch: None
       unfreeze_epoch: None
-    semantic_segmentation:
+    road_detection:
       name: UnetDecoder
       in_channels: 512
       channel_scale_factors: [2, 4, 8, 8]

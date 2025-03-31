@@ -17,7 +17,7 @@ from dataset.kitti.KittiDataset import KittiDataset
 from model.resnet import ResNet18, ResNet
 from model.decoder import UnetDecoder
 from model.multi_task_network import MultiTaskNetwork
-from utils.losses import GradLoss, MaskedMAE, MultiTaskLoss
+from utils.losses import GradLoss, MaskedMAE, MultiTaskLoss, BinaryCrossEntropyLoss
 
 
 def prepare_save_directories(args: dict, subfolder_name="train") -> None:
@@ -159,7 +159,12 @@ def freeze_params(
 
 ############################## TRAIN UTILS ##############################
 def configure_loss(loss_configs: dict) -> MultiTaskLoss:
-    loss_dict = {MaskedMAE.__name__: MaskedMAE(), GradLoss.__name__: GradLoss()}
+    loss_dict = {
+        MaskedMAE.__name__: MaskedMAE(),
+        GradLoss.__name__: GradLoss(),
+        BinaryCrossEntropyLoss.__name__: BinaryCrossEntropyLoss(),
+    }
+    breakpoint()
     task_losses = {task: [] for task in loss_configs.keys()}
     for task in loss_configs.keys():
         for loss_name in loss_configs[task]:

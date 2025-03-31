@@ -1,15 +1,3 @@
-dataset:
-  task_transform:
-    input: 
-      - Crop
-    depth: 
-      - Crop
-    semantic_segmentation:
-      - Crop
-  task_paths:
-    input: "./data/kitti/input"
-    depth: "./data/kitti/depth/train"
-
 model: 
   encoder: ResNet18
   decoder: UnetDecoder

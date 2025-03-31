@@ -71,3 +71,14 @@ class GradLoss(nn.Module):
         loss = F.l1_loss(grad_pred, grad_gt)
 
         return loss
+
+
+class BinaryCrossEntropyLoss(nn.Module):
+    def __init__(
+        self,
+    ):
+        super().__init__()
+        self.loss = nn.BCELoss(reduction="mean")
+
+    def forward(self, pred, gt):
+        return self.loss(pred, gt)
