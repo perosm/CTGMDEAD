@@ -5,16 +5,30 @@ dataset:
   task_transform:
     input: 
       - Crop
-    depth: 
+    depth:
+      - Crop
+    semantic_segmentation:
       - Crop
   task_paths:
     input: "./data/kitti/input"
     depth: "./data/kitti/depth/train"
+    semantic_segmentation: "./data/kitti/semantic_segmentation/train"
 
-dataloader:
-  batch_size: 2
-  shuffle: True
-  num_workers: 1
+train:
+  dataloader:
+    batch_size: 2
+    shuffle: True
+    num_workers: 1
+  aggregators_savers:
+    LossAggregator: LossSaver # bind aggregator to saver
+  savers:
+    LossSaver: LossAggregator # bind aggregator to saver
+
+eval:
+  dataloader:
+    batch_size: 2
+    shuffle: False
+    num_workers: 1
 
 model:
   encoder:
@@ -30,13 +44,14 @@ model:
       out_channels: 1
       freeze_epoch: None
       unfreeze_epoch: None
-    # semantic_segmentations:
-    #   name: UnetDecoder
-    #   in_channels: 512
-    #   channel_scale_factors: [2, 4, 8, 8]
-    #   out_channels: 1
-    #   freeze_epoch: 0
-    #   unfreeze_epoch: 10
+    semantic_segmentation:
+      name: UnetDecoder
+      in_channels: 512
+      channel_scale_factors: [2, 4, 8, 8]
+      out_channels: 1
+      freeze_epoch: 0
+      unfreeze_epoch: 10
+
 
 
 loss:

@@ -8,7 +8,10 @@ from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
 from torch.optim import Optimizer, Adam
 import torchvision.transforms.functional as F
-
+from utils.savers.Saver import Saver
+from utils.savers.LossSaver import LossSaver
+from utils.aggregators.Aggregator import Aggregator
+from utils.aggregators.LossAggregator import LossAggregator
 
 from dataset.kitti.KittiDataset import KittiDataset
 from model.resnet import ResNet18, ResNet
@@ -46,6 +49,17 @@ def configure_dataloader(
         shuffle=dataloader_configs["shuffle"],
         num_workers=dataloader_configs["num_workers"],
     )
+
+
+def configure_savers(
+    savers_configs: dict[str, str], aggregators: dict[str, Aggregator]
+) -> list[Saver]:
+    savers = []
+    savers_dict = {LossSaver.__class__.__name__: LossSaver}
+    for aggregator_name, saver_name in savers_configs.items():
+        savers.append(savers_dict[saver_name(aggregators[aggregator_name])])
+
+    return savers
 
 
 ############################## MODEL UTILS ##############################

@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from collections import defaultdict
 
 
 class MultiTaskLoss(nn.Module):
@@ -13,12 +14,14 @@ class MultiTaskLoss(nn.Module):
     ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
         total_loss = 0.0
         per_task_losses = {
-            task: [] for task in self.task_losses.keys()
+            task: defaultdict(torch.Tensor) for task in self.task_losses.keys()
         }  # used to keep track of losses per task
         for task, losses in self.task_losses.items():
             for loss in losses:
-                per_task_losses[task].append(loss(pred[task], gt[task]))
-                total_loss += per_task_losses[task][-1]
+                per_task_losses[task][loss.__class__.__name__] = loss(
+                    pred[task], gt[task]
+                )
+                total_loss += per_task_losses[task][loss.__class__.__name__]
 
         return total_loss, per_task_losses
 
