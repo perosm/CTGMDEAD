@@ -5,8 +5,11 @@ model:
 loss:
   depth: 
     - MAE
+  road_segmentation:
+    - BinaryCrossEntropyLoss
 
 metrics:
   depth:
     - MAE
-
+  road_segmentation:
+    - ConfusionMatrix

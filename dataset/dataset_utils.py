@@ -1,4 +1,5 @@
-import re
+import pathlib
+import enum
 
 import numpy as np
 import cv2
@@ -9,6 +10,30 @@ import torchvision.transforms.functional as F
 
 KITTI_H, KITTI_W = 375, 1242
 NEW_H, NEW_W = 256, 1184
+
+
+class TaskEnum(enum.StrEnum):
+    input = "input"
+    depth = "depth"
+    road_detection = "road_detection"
+    object_detection_3d = "object_detection_3d"
+
+
+def task_check_file_extension(task: str, file_path: str):
+    """
+    Used for filtering right files in KittiDataset.
+    """
+    task_extensions = {
+        TaskEnum.input: [".png"],
+        TaskEnum.depth: [".png"],
+        TaskEnum.road_detection: [".png"],
+        TaskEnum.object_detection_3d: [".txt"],
+    }
+
+    if pathlib.Path(file_path).suffix in task_extensions[task]:
+        return True
+
+    return False
 
 
 ############################## DATA LOAD UTILS ##############################
@@ -37,6 +62,17 @@ def depth_load_util():
     return func
 
 
+def road_detection_load_util():
+    """
+    Used to return the function that will load road detection ground truth.
+    """
+
+    def func(png_file_path) -> torch.Tensor:
+        return torchvision.io.read_image(png_file_path).to(torch.float32)
+
+    return func
+
+
 # TODO: finish for objdet
 OBJDET_LABEL_SHAPE = 5  # (type, x1, y1, x2, y2)
 objdet_class_mapping = {
@@ -52,12 +88,12 @@ objdet_class_mapping = {
 }
 
 
-def objdet_load_util():
+def object_detection_3d_load_util():
     """
     Used to return the function that will load the object detection labels accordingly.
     """
 
-    def func(txt_file_path):
+    def func(txt_file_path) -> torch.Tensor:
         with open(txt_file_path, "r") as file:
             lines = file.readlines()
         NUM_DETECTIONS = len(lines)
@@ -81,9 +117,10 @@ def load_utils(tasks: list[str]) -> dict:
     For given tasks returns utility functions to accordingly load the data.
     """
     task_load_type = {
-        "input": input_load_util(),
-        "depth": depth_load_util(),
-        "objdet": objdet_load_util(),
+        TaskEnum.input: input_load_util(),
+        TaskEnum.depth: depth_load_util(),
+        TaskEnum.road_detection: road_detection_load_util(),
+        TaskEnum.object_detection_3d: object_detection_3d_load_util(),
     }
     return {task: task_load_type[task] for task in tasks}
 

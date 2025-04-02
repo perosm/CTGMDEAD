@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 
-#################### DEPTH METRICS ####################
+#################### DEPTH ####################
 """
 Pictures are evaluated with batch size 1.
 """
@@ -80,3 +80,12 @@ class MaskedMeanAbsoluteError(nn.Module):
         masked_mae = (torch.abs((mask * pred - gt)).sum((2, 3)) / valid_points).mean()
 
         return masked_mae.cpu().item()
+
+
+#################### ROAD DETECTION ####################
+class ConfusionMatrix(nn.Module):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def forward(self) -> torch.Tensor:
+        pass

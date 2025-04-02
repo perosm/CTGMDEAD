@@ -1,12 +1,10 @@
-import os
-
 import torch
 import logging
 import matplotlib.pyplot as plt
-import pprint
+from tqdm import tqdm
+from utils.visual_inspection import plot_task_gt
 from utils.aggregators.LossAggregator import LossAggregator
 from utils.savers.LossSaver import LossSaver
-from tqdm import tqdm
 
 
 from utils.kitti.utils import (
@@ -74,13 +72,14 @@ def train(args: dict):
         freeze_model(model, args["model"], False, epoch)
         # for data in tqdm(train_dataloader, f"Epoch {epoch}"):
         data = {task: data[task].to(device) for task in data.keys()}
+        plot_task_gt(data)
         pred = model(data["input"])
         loss, per_batch_task_losses = losses(pred, data)
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
         loss_aggregator.aggregate_per_batch(per_batch_task_losses)
-
+        breakpoint()
     loss_saver.save_plot()
     torch.save(model.state_dict(), save_dir / "model.pth")
 

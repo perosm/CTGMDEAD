@@ -16,6 +16,7 @@ def main():
         for gt_image in sorted(args.data_road_gt.iterdir())
         if gt_image.is_file()
     ]
+
     root_dir_name = pathlib.Path("./data/kitti/road_detection")
     for path_info, gt_image in zip(path_informations, gt_images):
         date_drive_num, image_number = path_info.strip().split(" ")
@@ -24,13 +25,17 @@ def main():
         date_drive_num = pathlib.Path(f"{date_drive_num}_sync")
         full_source_path_name = pathlib.Path(gt_image).absolute()
         full_destination_path_name = (
-            root_dir_name / date / date_drive_num / "camera_02" / "data"
+            root_dir_name / date / date_drive_num / "image_02" / "data"
         ).absolute()
         full_destination_path_name.mkdir(parents=True, exist_ok=True)
         image_name = f"{image_number}.png"
         full_source_path_name.rename(full_destination_path_name / image_name)
 
     shutil.rmtree(args.data_road_gt.parent.parent)
+    shutil.rmtree(args.devkit_road_mapping.parent)
+    num_files = sum(1 for _ in root_dir_name.rglob("*") if _.is_file())
+    print(f"Number of files: {num_files}")
+    print(f"Number of mappings: {len(path_informations)}")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -41,7 +46,7 @@ def _parse_args() -> argparse.Namespace:
         type=pathlib.Path,
         default=pathlib.Path(
             "./data/kitti/data_road/training/gt_image_2"
-        ),  # left camera image
+        ),  # left camera images
         help="Path to road segmentation ground truth.",
     )
     parser.add_argument(

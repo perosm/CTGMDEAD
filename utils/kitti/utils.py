@@ -164,7 +164,6 @@ def configure_loss(loss_configs: dict) -> MultiTaskLoss:
         GradLoss.__name__: GradLoss(),
         BinaryCrossEntropyLoss.__name__: BinaryCrossEntropyLoss(),
     }
-    breakpoint()
     task_losses = {task: [] for task in loss_configs.keys()}
     for task in loss_configs.keys():
         for loss_name in loss_configs[task]:

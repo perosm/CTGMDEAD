@@ -12,11 +12,12 @@ dataset:
   task_paths:
     input: "./data/kitti/input"
     depth: "./data/kitti/depth/train"
-    road_detection: "./data/kitti/road_detection/training"
+    road_detection: "./data/kitti/road_detection"
+    # object_detection_3d: "./data/kitti/object_detection_3d"
 
 train:
   dataloader:
-    batch_size: 2
+    batch_size: 1
     shuffle: True
     num_workers: 1
   aggregators_savers:
@@ -26,7 +27,7 @@ train:
 
 eval:
   dataloader:
-    batch_size: 2
+    batch_size: 1
     shuffle: False
     num_workers: 1
 
@@ -51,12 +52,15 @@ model:
       out_channels: 1
       freeze_epoch: 0
       unfreeze_epoch: 10
+    # object_detection_3d:
 
 
 
 loss:
   depth: 
-     - MaskedMAE
+    - MaskedMAE
+  road_detection:
+    - BinaryCrossEntropyLoss
 
 optimizer:
   name: Adam

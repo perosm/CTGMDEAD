@@ -1,8 +1,7 @@
 import os
-from pathlib import Path
+import pathlib
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
-from typing import Dict, List
 from torch.utils.data import DataLoader
 import dataset.dataset_utils as KITTIutils
 import sys
@@ -12,9 +11,9 @@ class KittiDataset(Dataset):
 
     def __init__(
         self,
-        task_paths: Dict[str, str],
-        task_transform: Dict[str, list],
-        camera: str = "02",
+        task_paths: dict[str, str],
+        task_transform: dict[str, list],
+        camera: str = "image_02",
     ) -> None:
         """
         Args:
@@ -27,63 +26,45 @@ class KittiDataset(Dataset):
             KITTIutils.task_tranform_mapping(task_transform)
         )
         self.task_paths = {
-            task: os.path.abspath(task_paths[task]) for task in task_paths.keys()
+            task: pathlib.Path(task_paths[task]) for task in task_paths.keys()
         }
         self.camera = camera
 
         self._load_data_paths()
         self._filter_data_paths()
+        self.load_functions = KITTIutils.load_utils(list(self.paths_dict.keys()))
 
     def _configure_transforms(
         self, task_transform: dict
-    ) -> Dict[str, transforms.Compose]:
+    ) -> dict[str, transforms.Compose]:
         return {
             task: transforms.Compose(*[task_transform[task]]) for task in task_transform
         }
 
     def _load_data_paths(self) -> None:
         self.paths_dict = {key: [] for key in self.task_paths.keys()}
-        for key in self.task_paths.keys():
-            for root_path, dirs, files in os.walk(self.task_paths[key]):
-                if self.camera in root_path:  # for input and depth
-                    if "objdet" in self.task_paths[key]:
-                        self.paths_dict[key].extend(
-                            sorted(
-                                [
-                                    os.path.join(root_path, file)
-                                    for file in files
-                                    if file.split(".")[1] in ["txt"]
-                                ]
-                            )
-                        )
-                    else:
-                        self.paths_dict[key].extend(
-                            sorted(
-                                [
-                                    os.path.join(root_path, file)
-                                    for file in files
-                                    if file.split(".")[1] in ["png", "jpg"]
-                                ]
-                            )
-                        )
+        for task in self.task_paths.keys():
+            for root_path, dirs, files in self.task_paths[task].walk():
+                if self.camera in str(root_path):  # for input and depth
+                    self.paths_dict[task].extend(
+                        root_path / file
+                        for file in files
+                        if KITTIutils.task_check_file_extension(task, file)
+                    )
 
-            self.paths_dict[key] = sorted(self.paths_dict[key])
+            self.paths_dict[task] = sorted(self.paths_dict[task])
 
     def _filter_data_paths(self):
         task_root_paths = {
-            task: os.path.abspath(self.task_paths[task])
-            for task in self.task_paths.keys()
+            task: self.task_paths[task].absolute() for task in self.task_paths.keys()
         }
-        for task in self.task_paths.keys():
-            breakpoint()
-            print(task, self.paths_dict[task][0][-4:])
         task_extension = {
-            task: self.paths_dict[task][0][-4:] for task in self.task_paths.keys()
+            task: self.paths_dict[task][0].suffix for task in self.task_paths.keys()
         }
         task_unique_data = {task: set() for task in self.task_paths.keys()}
         for task, paths in self.paths_dict.items():
             for path in paths:
-                task_unique_data[task].add(path.replace(task_root_paths[task], "")[:-4])
+                task_unique_data[task].add("/".join(path.with_suffix("").parts[-5:]))
 
         final_paths = task_unique_data["input"]
         for task, unique_data in task_unique_data.items():
@@ -92,7 +73,7 @@ class KittiDataset(Dataset):
         for task in task_root_paths.keys():
             self.paths_dict[task] = sorted(
                 [
-                    task_root_paths[task] + path + task_extension[task]
+                    task_root_paths[task] / f"{path}{task_extension[task]}"
                     for path in final_paths
                 ]
             )
@@ -110,11 +91,10 @@ class KittiDataset(Dataset):
         return self.length
 
     def __getitem__(self, idx):
-        load_functions = KITTIutils.load_utils(list(self.paths_dict.keys()))
         task_item = dict.fromkeys(self.paths_dict.keys())
         for task in self.paths_dict.keys():
             task_item[task] = self.task_transform[task](
-                load_functions[task](self.paths_dict[task][idx])
+                self.load_functions[task](self.paths_dict[task][idx])
             )
 
         return task_item

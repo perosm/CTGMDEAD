@@ -19,9 +19,11 @@ def main():
             args.configs_dir_path / CONFIG_NUMBERS_TXT
         )
         default_yaml = _load_yaml_file(args.configs_dir_path / DEFAULT_YAML)
-        config_yaml = _find_configs_yaml_file(
+        config_yaml_path = _find_configs_yaml_file(
             args.configs_dir_path / CONFIGS_INFO_DIR, config_numbers
         )
+        config_yaml = _load_yaml_file(config_yaml_path.absolute())
+        config_yaml.update({"name": config_yaml_path.stem})
         config_yaml.update(default_yaml)
 
         train.train(config_yaml)
@@ -58,13 +60,13 @@ def _read_configs_txt_file(filepath: pathlib.Path) -> list[str]:
 
 def _find_configs_yaml_file(
     configs_directory: pathlib.Path, config_numbers: list[str]
-) -> dict:
+) -> pathlib.Path:
     wanted_config_number = config_numbers[0]
     if configs_directory.is_dir():
         for yaml_file in configs_directory.iterdir():
             curr_config_number = yaml_file.parts[-1].split("_")[0]
             if wanted_config_number == curr_config_number:
-                return _load_yaml_file(yaml_file.absolute())
+                return yaml_file
 
 
 def _load_yaml_file(yaml_file: pathlib.Path) -> dict:
