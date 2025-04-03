@@ -11,6 +11,7 @@ def main():
         with open(file_txt, "r") as file:
             path_informations.extend(file.readlines())
 
+    path_informations.sort()
     gt_images = [
         gt_image
         for gt_image in sorted(args.data_road_gt.iterdir())

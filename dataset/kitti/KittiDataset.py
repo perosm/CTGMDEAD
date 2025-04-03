@@ -96,7 +96,8 @@ class KittiDataset(Dataset):
             task_item[task] = self.task_transform[task](
                 self.load_functions[task](self.paths_dict[task][idx])
             )
-
+            print(self.paths_dict[task][idx])
+        # task_item.update({"path": self.paths_dict[idx]})
         return task_item
 
 
