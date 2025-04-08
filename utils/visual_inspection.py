@@ -20,5 +20,9 @@ def plot_task_gt(task_groundtruth: dict[str, torch.Tensor]):
         ax[i].set_title(f"Task: {task}")
         ax[i].axis("off")
 
+    def on_key(event):
+        plt.close()
+
     plt.tight_layout()
+    fig.canvas.mpl_connect("key_press_event", on_key)
     plt.show()

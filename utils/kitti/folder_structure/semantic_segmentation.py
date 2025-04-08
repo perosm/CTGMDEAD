@@ -1,15 +1,11 @@
-import re
-from tqdm import tqdm
 import shutil
 import argparse
 import pathlib
-import numpy as np
 import matplotlib.pyplot as plt
 
 import cv2
 
 
-# https://www.zemris.fer.hr/~ssegvic/multiclod/kitti_semseg_unizg.shtml
 """
 Nr.     Sequence name     Start   End
 ---------------------------------------
