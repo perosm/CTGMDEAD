@@ -1,10 +1,9 @@
-import os
+import torch
 import pathlib
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
 from torch.utils.data import DataLoader
 import dataset.dataset_utils as KITTIutils
-import sys
 
 
 class KittiDataset(Dataset):
@@ -29,7 +28,7 @@ class KittiDataset(Dataset):
             task: pathlib.Path(task_paths[task]) for task in task_paths.keys()
         }
         self.camera = camera
-
+        self._fetch_projection_matrices()
         self._load_data_paths()
         self._filter_data_paths()
         self.load_functions = KITTIutils.load_utils(list(self.paths_dict.keys()))
@@ -40,6 +39,20 @@ class KittiDataset(Dataset):
         return {
             task: transforms.Compose(*[task_transform[task]]) for task in task_transform
         }
+
+    def _fetch_projection_matrices(self) -> None:
+        self.date_to_projection_matrix = {}
+        index = self.camera.split("_")[-1]
+        CAMERA_INFO_FILE = "calib_cam_to_cam.txt"
+        for date in self.task_paths[KITTIutils.TaskEnum.input].iterdir():
+            with open(f"{date}/{CAMERA_INFO_FILE}", "r") as file:
+                lines = file.readlines()
+                for line in lines:
+                    key, value = line.split(": ")
+                    if f"P_rect_{index}" == key:
+                        self.date_to_projection_matrix[date] = torch.Tensor(
+                            [float(num) for num in value.strip().split(" ")]
+                        ).reshape(3, 4)
 
     def _load_data_paths(self) -> None:
         self.paths_dict = {key: [] for key in self.task_paths.keys()}
@@ -66,7 +79,7 @@ class KittiDataset(Dataset):
             for path in paths:
                 task_unique_data[task].add("/".join(path.with_suffix("").parts[-5:]))
 
-        final_paths = task_unique_data["input"]
+        final_paths = task_unique_data[KITTIutils.TaskEnum.input]
         for task, unique_data in task_unique_data.items():
             final_paths = final_paths.intersection(unique_data)
 
@@ -96,7 +109,7 @@ class KittiDataset(Dataset):
             task_item[task] = self.task_transform[task](
                 self.load_functions[task](self.paths_dict[task][idx])
             )
-            print(self.paths_dict[task][idx])
+            # print(self.paths_dict[task][idx])
         # task_item.update({"path": self.paths_dict[idx]})
         return task_item
 

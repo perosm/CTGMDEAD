@@ -12,13 +12,13 @@ dataset:
   task_paths:
     input: "./data/kitti/input"
     depth: "./data/kitti/depth/train"
-    road_detection: "./data/kitti/road_detection"
+    road_detection: "./data/kitti/semantic_segmentation"
     # object_detection_3d: "./data/kitti/object_detection_3d"
 
 train:
   dataloader:
     batch_size: 1
-    shuffle: True
+    shuffle: False
     num_workers: 1
   aggregators_savers:
     LossAggregator: LossSaver # bind aggregator to saver
