@@ -43,7 +43,7 @@ def input_load_util():
     """
 
     def func(png_file_path):
-        return torchvision.io.read_image(png_file_path).to(torch.float32)
+        return torchvision.io.decode_image(png_file_path).to(torch.float32)
 
     return func
 
@@ -62,20 +62,49 @@ def depth_load_util():
     return func
 
 
+SEMANTIC_SEGMENTATION_MAPPING = {
+    "sky": torch.Tensor([128.0, 128.0, 128.0]),
+    "building": torch.Tensor([128.0, 0.0, 0.0]),
+    "road": torch.Tensor([128.0, 64.0, 128.0]),
+    "sidewalk": torch.Tensor([0.0, 0.0, 192.0]),
+    "fence": torch.Tensor([64.0, 64.0, 128.0]),
+    "vegetation": torch.Tensor([128.0, 128.0, 0.0]),
+    "pole": torch.Tensor([192.0, 192.0, 128.0]),
+    "car": torch.Tensor([64.0, 0.0, 128.0]),
+    "sign": torch.Tensor([192.0, 128.0, 128.0]),
+    "pedestrian": torch.Tensor([64.0, 64.0, 0.0]),
+    "cyclist": torch.Tensor([0.0, 128.0, 192.0]),
+    "ignore": torch.Tensor([0.0, 0.0, 0.0]),
+}
+
+
 def road_detection_load_util():
     """
     Used to return the function that will load road detection ground truth.
+
+    Note: Due to labelling of kitti road detection data we use semantic segmentation data
+    and convert labels so we just use the road labeling.
     """
 
     def func(png_file_path) -> torch.Tensor:
-        return torchvision.io.read_image(png_file_path).to(torch.float32)
+        ground_truth = torchvision.io.decode_image(png_file_path, mode="RGB").to(
+            torch.float32
+        )
+        mask = torch.where(
+            (ground_truth == SEMANTIC_SEGMENTATION_MAPPING["road"].view(3, 1, 1)).all(
+                dim=0
+            ),
+            1,
+            0,
+        ).unsqueeze(0)
+        return mask
 
     return func
 
 
 # TODO: finish for objdet
 OBJDET_LABEL_SHAPE = 5  # (type, x1, y1, x2, y2)
-objdet_class_mapping = {
+OBJDET_CLASS_MAPPING = {
     "Car": 0,
     "Van": 1,
     "Truck": 2,
@@ -100,7 +129,7 @@ def object_detection_3d_load_util():
         y = torch.zeros(shape=(NUM_DETECTIONS, OBJDET_LABEL_SHAPE))
         for i in range(len(lines)):
             elements = lines[i].split(" ")
-            type = objdet_class_mapping[elements[0]]
+            type = OBJDET_CLASS_MAPPING[elements[0]]
             left = float(elements[4])
             top = float(elements[5])
             right = float(elements[6])
