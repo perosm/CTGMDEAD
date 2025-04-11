@@ -57,7 +57,7 @@ class KittiDataset(Dataset):
     def _load_data_paths(self) -> None:
         self.paths_dict = {key: [] for key in self.task_paths.keys()}
         for task in self.task_paths.keys():
-            for root_path, dirs, files in self.task_paths[task].walk():
+            for root_path, _, files in self.task_paths[task].walk():
                 if self.camera in str(root_path):  # for input and depth
                     self.paths_dict[task].extend(
                         root_path / file
@@ -109,8 +109,7 @@ class KittiDataset(Dataset):
             task_item[task] = self.task_transform[task](
                 self.load_functions[task](self.paths_dict[task][idx])
             )
-            # print(self.paths_dict[task][idx])
-        # task_item.update({"path": self.paths_dict[idx]})
+            print(task, self.paths_dict[task][idx])
         return task_item
 
 

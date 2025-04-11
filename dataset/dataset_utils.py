@@ -103,7 +103,11 @@ def road_detection_load_util():
 
 
 # TODO: finish for objdet
-OBJDET_LABEL_SHAPE = 5  # (type, x1, y1, x2, y2)
+#
+# see readme from devkit_object
+# name (#values)
+# type (1), truncated (1), occluded (1), alpha (1), bbox (4), dimension (3), location (3), rotation_y (1)
+OBJDET_LABEL_SHAPE = 15
 OBJDET_CLASS_MAPPING = {
     "Car": 0,
     "Van": 1,
@@ -124,19 +128,27 @@ def object_detection_3d_load_util():
 
     def func(txt_file_path) -> torch.Tensor:
         with open(txt_file_path, "r") as file:
-            lines = file.readlines()
+            lines = [line.strip().split(" ") for line in file.readlines()]
         NUM_DETECTIONS = len(lines)
-        y = torch.zeros(shape=(NUM_DETECTIONS, OBJDET_LABEL_SHAPE))
-        for i in range(len(lines)):
-            elements = lines[i].split(" ")
-            type = OBJDET_CLASS_MAPPING[elements[0]]
-            left = float(elements[4])
-            top = float(elements[5])
-            right = float(elements[6])
-            bottom = float(elements[7])
-            y[i] = torch.Tensor([type, left, top, right, bottom])
+        gt = np.empty(shape=(NUM_DETECTIONS, OBJDET_LABEL_SHAPE), dtype=np.float32)
+        for object_index, object_info in enumerate(lines):
+            gt[object_index, 0] = OBJDET_CLASS_MAPPING[object_info[0]]  # class
+            gt[object_index, 1] = object_info[1]  # truncated flag
+            gt[object_index, 2] = object_info[2]  # occluded flag
+            gt[object_index, 3] = object_info[3]  # observation angle
+            gt[object_index, 4:8] = [
+                float(image_coord) for image_coord in object_info[4:8]
+            ]  # 2d bbox image coordinates
+            # gt[object_index, 4] -= KITTI_H - NEW_H  # top
+            # gt[object_index, 5] -= (KITTI_W - NEW_W) / 2  # left
+            # gt[object_index, 6] -= KITTI_H - NEW_H  # bottom
+            # gt[object_index, 7] -= (KITTI_W - NEW_W) / 2  # top
 
-        return y
+            gt[object_index, 8:15] = [
+                float(world_coord) for world_coord in object_info[8:15]
+            ]  # 3d bbox world coordinates
+
+        return torch.from_numpy(gt)
 
     return func
 
@@ -169,7 +181,7 @@ class CropImage(object):
         return F.crop(img, self.top, self.left, self.height, self.width)
 
 
-def task_tranform_mapping(task_transforms_str: dict[str, str]) -> dict[str, list]:
+def task_tranform_mapping(task_transforms_list: dict[str, str]) -> dict[str, list]:
     """
     Pairs strings from .yaml file to torch transforms accordingly.
 
@@ -180,9 +192,10 @@ def task_tranform_mapping(task_transforms_str: dict[str, str]) -> dict[str, list
         "Crop": CropImage(),
         "ToTensor": transforms.ToTensor(),
     }
-    task_transforms = {task: [] for task in task_transforms_str.keys()}
-    for task in task_transforms_str.keys():
-        for transform_str in task_transforms_str[task]:
-            task_transforms[task].append(transforms_dict[transform_str])
+    task_transforms = {task: [] for task in task_transforms_list.keys()}
+    for task in task_transforms_list.keys():
+        if task_transforms_list[task]:
+            for transform_str in task_transforms_list[task]:
+                task_transforms[task].append(transforms_dict[transform_str])
 
     return task_transforms
