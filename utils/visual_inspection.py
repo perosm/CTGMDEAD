@@ -3,58 +3,53 @@ import cv2
 import torch
 import matplotlib.pyplot as plt
 import dataset.dataset_utils as KITTIUtils
-from matplotlib import patches
 from dataset.dataset_utils import TaskEnum
 
 
-def plot_task_gt(task_groundtruth: dict[str, torch.Tensor]):
-    tasks = task_groundtruth.keys()
-    fig, ax = plt.subplots(len(tasks), 1, figsize=(8, 36))
+def plot_task_gt(task_ground_truth: dict[str, torch.Tensor]):
+    tasks = task_ground_truth.keys()
+    fig, ax = plt.subplots(
+        len(tasks), 1, figsize=(8, 36)
+    )  # Note: +1 is for 2D grond truth labels of object detection
 
-    for i, (task, groundtruth) in enumerate(task_groundtruth.items()):
+    for i, (task, ground_truth) in enumerate(task_ground_truth.items()):
+        if task not in list(TaskEnum):  # for projection matrices
+            continue
         if task == TaskEnum.object_detection_3d:
-            img = (
-                task_groundtruth[TaskEnum.input]
+            image = (
+                task_ground_truth[TaskEnum.input]
                 .squeeze(0)
                 .permute(1, 2, 0)
                 .detach()
                 .cpu()
                 .numpy()
-                .astype(np.int16)
+                .astype(np.uint8)
+                .copy()
             )
-            groundtruth = groundtruth.squeeze(0).detach().cpu().numpy()
-            for object_info in groundtruth:
-                left, top, right, bottom = object_info[4:8].astype(np.int16)
-                # changing start of axes
-                # new_top = abs(KITTIUtils.NEW_H - top)
-                # new_bottom = abs(KITTIUtils.NEW_H - bottom)
-                width = left - right
-                height = top - bottom
-                print(object_info[4:8].astype(np.int16))
-                #  rect = patches.Rectangle(
-                #     xy=(left, KITTIUtils.KITTI_H - top - height),
-                #     width=width,
-                #     height=height,
-                #     linewidth=2,
-                #     edgecolor="r",
-                #     facecolor="none",
-                # )
-                # ax[i].add_patch(rect)
-                img[top:bottom, left, :] = (255, 0, 0)  # left line
-                img[top:bottom, right, :] = (255, 0, 0)  # right line
-                img[top, left:right, :] = (255, 0, 0)  # top line
-                img[bottom, left:right, :] = (255, 0, 0)  # bottom line
+            image_bbox_3d = image.copy()
+            ground_truth = ground_truth.squeeze(0).detach().cpu().numpy()
+            projection_matrix = (
+                task_ground_truth["projection_matrix"].squeeze(0).detach().cpu().numpy()
+            )
+            for object_info in ground_truth:
+                bbox_2d, bbox_3d = _read_object_detection_gt_info(object_info)
+                draw_bbox(image, bbox_2d)
+                bbox_3d_projected = project_3d_bbox_to_image(bbox_3d, projection_matrix)
+                draw_3d_bbox(image_bbox_3d, bbox_3d_projected)
 
+            ax[i + 1].imshow(image_bbox_3d)
+            ax[i + 1].set_title(f"Task: {task}")
+            ax[i + 1].axis("off")
         else:
-            img = (
-                groundtruth.squeeze(0)
+            image = (
+                ground_truth.squeeze(0)
                 .permute(1, 2, 0)
                 .detach()
                 .cpu()
                 .numpy()
-                .astype(np.int16)
+                .astype(np.uint8)
             )
-        ax[i].imshow(img)
+        ax[i].imshow(image)
         ax[i].set_title(f"Task: {task}")
         ax[i].axis("off")
 
@@ -66,9 +61,16 @@ def plot_task_gt(task_groundtruth: dict[str, torch.Tensor]):
     plt.show()
 
 
+def _read_object_detection_gt_info(object_info: np.ndarray) -> np.ndarray:
+    bbox_2d = np.array([int(float(image_coords)) for image_coords in object_info[4:8]])
+    bbox_3d = np.array([float(world_coords) for world_coords in object_info[8:15]])
+
+    return bbox_2d, bbox_3d
+
+
 def draw_bbox(image: np.ndarray, bbox: np.ndarray):
     left, top, right, bottom = bbox
-    # Note: cv2 plots coordinates differently
+    # Note: cv2 coordinate system starts at the bottom left of an image
     cv2.line(image, (left, top), (right, top), color=(255, 0, 0), thickness=1)
     cv2.line(image, (left, top), (left, bottom), color=(255, 0, 0), thickness=1)
     cv2.line(image, (right, top), (right, bottom), color=(255, 0, 0), thickness=1)

@@ -45,7 +45,7 @@ def train(args: dict):
         # freeze_model(model, args["model"], False, epoch)
         for data in tqdm(train_dataloader, f"Epoch {epoch}"):
             data = {task: data[task].to(device) for task in data.keys()}
-            plot_task_gt(data)
+            # plot_task_gt(data)
         # pred = model(data["input"])
         # loss, per_batch_task_losses = losses(pred, data)
         # loss.backward()

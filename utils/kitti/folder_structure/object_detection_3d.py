@@ -47,9 +47,9 @@ def main():
             ground_truth_destination_dir / f"{frame}{ground_truth_path.suffix}"
         )
         calibration_path.replace(
-            calibration_destination_dir / f"{frame}.{calibration_path.suffix}"
+            calibration_destination_dir / f"{frame}{calibration_path.suffix}"
         )
-    breakpoint()
+
     shutil.rmtree(mapping_path.parent)
     shutil.rmtree(ground_truth_dir.parent.parent)
     shutil.rmtree(calibration_dir.parent.parent)

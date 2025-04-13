@@ -7,6 +7,7 @@ import dataset.dataset_utils as KITTIutils
 
 
 class KittiDataset(Dataset):
+    UNIQUE_PATH_PARTS_NUMBER = -5
 
     def __init__(
         self,
@@ -27,9 +28,11 @@ class KittiDataset(Dataset):
         self.task_paths = {
             task: pathlib.Path(task_paths[task]) for task in task_paths.keys()
         }
+        self.paths_dict = {key: [] for key in self.task_paths.keys()}
         self.camera = camera
-        self._fetch_projection_matrices()
+        self.camera_index = int(camera[-1])
         self._load_data_paths()
+        self._fetch_projection_matrices()
         self._filter_data_paths()
         self.load_functions = KITTIutils.load_utils(list(self.paths_dict.keys()))
 
@@ -41,21 +44,72 @@ class KittiDataset(Dataset):
         }
 
     def _fetch_projection_matrices(self) -> None:
-        self.date_to_projection_matrix = {}
-        index = self.camera.split("_")[-1]
-        CAMERA_INFO_FILE = "calib_cam_to_cam.txt"
-        for date in self.task_paths[KITTIutils.TaskEnum.input].iterdir():
-            with open(f"{date}/{CAMERA_INFO_FILE}", "r") as file:
-                lines = file.readlines()
-                for line in lines:
-                    key, value = line.split(": ")
-                    if f"P_rect_{index}" == key:
-                        self.date_to_projection_matrix[date] = torch.Tensor(
-                            [float(num) for num in value.strip().split(" ")]
-                        ).reshape(3, 4)
+        if not self.paths_dict[KITTIutils.TaskEnum.object_detection_3d]:
+            return
+
+        self.ground_truth_path_to_projection_matrices = {}
+        for ground_truth_objdet3d_path in self.paths_dict[
+            KITTIutils.TaskEnum.object_detection_3d
+        ]:
+
+            calibrations_path = str(ground_truth_objdet3d_path).replace(
+                "ground_truth", "calibrations"
+            )
+            frame_id = "/".join(
+                str(ground_truth_objdet3d_path).split("/")[
+                    self.UNIQUE_PATH_PARTS_NUMBER :
+                ]
+            )
+            self.ground_truth_path_to_projection_matrices[frame_id] = (
+                self._read_projection_matrix(calibrations_path)
+            )
+
+    def _read_projection_matrix(self, object_detection_calibration_path: pathlib.Path):
+        with open(object_detection_calibration_path, "r") as file:
+            last_row = torch.Tensor([[0, 0, 0, 1]])
+            projection_matrix = torch.vstack(
+                (
+                    torch.Tensor(
+                        [
+                            float(number)
+                            for number in file.readlines()[self.camera_index]
+                            .split(": ")[1]
+                            .strip()
+                            .split()
+                        ]
+                    ).reshape(3, 4),
+                    last_row,
+                )
+            )
+
+        return projection_matrix
+
+    def load_projection_matrix(self, frame: str) -> torch.Tensor:
+        """
+        Based on the given frame loads a projection matrix.
+
+        For object detection loads projection matrix for specific frame,
+        otherwise fetches a "default" projection matrix used in kitti.
+        TODO: Should I always search for a projection matrix even if for that
+        particular frame one does not exist but instead fetch the projection
+        matrix from a frame which is closest?
+
+        Args:
+            - frame: Frame name for which a projection matrix is fetched.
+
+        Returns:
+            Projection matrix for a frame.
+        """
+        projection_matrix = self.ground_truth_path_to_projection_matrices.get(
+            frame, None
+        )
+        if projection_matrix:
+            return projection_matrix
+
+        # TODO: fetch closest projection matrix to that frame
+        return
 
     def _load_data_paths(self) -> None:
-        self.paths_dict = {key: [] for key in self.task_paths.keys()}
         for task in self.task_paths.keys():
             for root_path, _, files in self.task_paths[task].walk():
                 if self.camera in str(root_path):  # for input and depth
@@ -77,7 +131,11 @@ class KittiDataset(Dataset):
         task_unique_data = {task: set() for task in self.task_paths.keys()}
         for task, paths in self.paths_dict.items():
             for path in paths:
-                task_unique_data[task].add("/".join(path.with_suffix("").parts[-5:]))
+                task_unique_data[task].add(
+                    "/".join(
+                        path.with_suffix("").parts[self.UNIQUE_PATH_PARTS_NUMBER :]
+                    )
+                )
 
         final_paths = task_unique_data[KITTIutils.TaskEnum.input]
         for task, unique_data in task_unique_data.items():
@@ -101,6 +159,7 @@ class KittiDataset(Dataset):
         return task_item
 
     def __len__(self) -> int:
+        """Returns number of samples."""
         return self.length
 
     def __getitem__(self, idx):
@@ -109,35 +168,18 @@ class KittiDataset(Dataset):
             task_item[task] = self.task_transform[task](
                 self.load_functions[task](self.paths_dict[task][idx])
             )
-            print(task, self.paths_dict[task][idx])
+        if KITTIutils.TaskEnum.object_detection_3d in self.paths_dict.keys():
+            print(
+                self.paths_dict[KITTIutils.TaskEnum.object_detection_3d][idx].parts[
+                    self.UNIQUE_PATH_PARTS_NUMBER :
+                ]
+            )
+            frame_id = "/".join(
+                self.paths_dict[KITTIutils.TaskEnum.object_detection_3d][idx].parts[
+                    self.UNIQUE_PATH_PARTS_NUMBER :
+                ]
+            )
+            projection_matrix = self.ground_truth_path_to_projection_matrices[frame_id]
+            task_item.update({"projection_matrix": projection_matrix})
+
         return task_item
-
-
-if __name__ == "__main__":
-    kitti_dataset = KittiDataset(
-        {
-            "input": "./data/kitti/input",  # ../../datasets/kitti_data/
-            "depth": "./data/kitti/depth/train",
-            # "objdet": "./data/kitti/objdet/train",
-        },
-        {
-            "input": [
-                # "ToTensor",
-                "Crop",
-            ],
-            "depth": [
-                # "ToTensor",
-                "Crop",
-            ],
-            # "objdet": [
-            #     "ToTensor",
-            # ],
-        },
-        "image_02",
-    )
-
-    train_dataloader = DataLoader(
-        dataset=kitti_dataset, batch_size=1, shuffle=True, num_workers=1
-    )
-    sample = next(iter(train_dataloader))
-    breakpoint()
