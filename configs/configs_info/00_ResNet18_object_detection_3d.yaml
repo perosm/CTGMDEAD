@@ -9,6 +9,7 @@ dataset:
   task_paths:
     input: "./data/kitti/input_object_detection_3d"
     object_detection_3d: "./data/kitti/object_detection_3d"
+    # calibration_files: "./"
 
 train:
   dataloader:
