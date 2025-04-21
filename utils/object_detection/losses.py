@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 
-class ClassificationLoss(nn.Module):
+class RPNClassificationLoss(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.loss = nn.BCELoss(reduction="mean")
@@ -19,3 +19,12 @@ class RegressionLoss(nn.Module):
 
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
         return self.regularization_factor * self.loss(y_pred, y_true)
+
+
+class RCNNCrossEntropyLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.loss = nn.CrossEntropyLoss()
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        return self.loss(y_pred, y_true)

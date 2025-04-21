@@ -6,7 +6,7 @@ from model.object_detection.anchor_generator import AnchorGenerator
 
 
 class FPNFasterRCNN(nn.Module):
-    def __init__(self, num_channels_per_feature_map: list[int]):
+    def __init__(self, num_channels_per_feature_map: list[int], training: bool = True):
         super().__init__()
         self.rpn = RegionProposalNetwork(
             num_channels_per_feature_map
@@ -26,6 +26,7 @@ class FPNFasterRCNN(nn.Module):
             ),
         )
         self.roi = ROINetwork()
+        self.training = training
 
     def forward(
         self,
@@ -42,6 +43,15 @@ class FPNFasterRCNN(nn.Module):
                 ]  # TODO: needs a bit of change :)
             )
 
-        objectness_score_per_feature_map, bbox_regression_per_feature_map = self.rpn(
-            fpn_outputs
-        )
+        if self.training:
+            objectness_score_per_feature_map, proposals_per_feature_map = self.rpn(
+                fpn_outputs, y_true
+            )
+        else:
+            objectness_score_per_feature_map, proposals_per_feature_map = self.rpn(
+                fpn_outputs
+            )
+
+        class_logits, bounding_box_deltas = self.roi(proposals_per_feature_map)
+
+        return class_logits, bounding_box_deltas
