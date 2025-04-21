@@ -14,7 +14,7 @@ from dataset.kitti.KittiDataset import KittiDataset
 from model.resnet import ResNet18
 from model.decoder import UnetDecoder
 from model.encoder_decoder import DepthEncoderDecoder
-from utils.metrics import (
+from utils.shared.metrics import (
     MaskedAverageRelativeError,
     MaskedRMSE,
     MaskedThresholdAccracy,

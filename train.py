@@ -2,9 +2,9 @@ import torch
 import logging
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from utils.visual_inspection import plot_task_gt
-from utils.aggregators.LossAggregator import LossAggregator
-from utils.savers.LossSaver import LossSaver
+from utils.shared.visual_inspection import plot_task_gt
+from utils.shared.aggregators.LossAggregator import LossAggregator
+from utils.shared.savers.LossSaver import LossSaver
 
 
 from utils.kitti.utils import (
@@ -40,19 +40,21 @@ def train(args: dict):
     )
     loss_saver = LossSaver(loss_aggregator=loss_aggregator, save_dir=save_dir)
 
-    # data = next(iter(train_dataloader))
+    data = next(iter(train_dataloader))
+    data = {task: data[task].to(device) for task in data.keys()}
     for epoch in range(epochs):
         # freeze_model(model, args["model"], False, epoch)
-        for data in tqdm(train_dataloader, f"Epoch {epoch}"):
-            data = {task: data[task].to(device) for task in data.keys()}
-            # plot_task_gt(data)
+        # for data in tqdm(train_dataloader, f"Epoch {epoch}"):
+        # data = {task: data[task].to(device) for task in data.keys()}
+        plot_task_gt(data)
+
         # pred = model(data["input"])
-        # loss, per_batch_task_losses = losses(pred, data)
-        # loss.backward()
-        # optimizer.step()
-        # optimizer.zero_grad()
-        # loss_aggregator.aggregate_per_batch(per_batch_task_losses)
-    loss_saver.save_plot()
+    # loss, per_batch_task_losses = losses(pred, data)
+    # loss.backward()
+    # optimizer.step()
+    # optimizer.zero_grad()
+    # loss_aggregator.aggregate_per_batch(per_batch_task_losses)
+    # loss_saver.save_plot()
     # torch.save(model.state_dict(), save_dir / "model.pth")
 
     return

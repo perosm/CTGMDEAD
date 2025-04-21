@@ -31,7 +31,7 @@ class UnetLayer(nn.Module):
             bias=False,
         )
 
-    def forward(self, x, e) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, e: torch.Tensor) -> torch.Tensor:
         x = self.upconv1(x)
         x = torch.cat([e, x], dim=1)
         return self.conv2(self.relu(self.conv1(x)))
@@ -62,7 +62,14 @@ class UnetDecoder(nn.Module):
             in_channels // channel_scale_factors[3], out_channels, kernel_size=1
         )
 
-    def forward(self, e0, e1, e2, e3, e4) -> torch.Tensor:
+    def forward(
+        self,
+        e0: torch.Tensor,
+        e1: torch.Tensor,
+        e2: torch.Tensor,
+        e3: torch.Tensor,
+        e4: torch.Tensor,
+    ) -> torch.Tensor:
         x = self.layer1(e4, e3)
         x = self.layer2(x, e2)
         x = self.layer3(x, e1)

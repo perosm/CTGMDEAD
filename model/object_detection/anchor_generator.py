@@ -128,10 +128,11 @@ class AnchorGenerator(nn.Module):
         return anchors
 
     def forward(
-        self, input_image: torch.Tensor, feature_maps: list[torch.Tensor]
+        self,
+        image_size: tuple[int, int],
+        feature_maps: list[torch.Tensor],
     ) -> tuple[torch.Tensor, tuple[torch.Tensor, ...]]:
         grid_sizes = [feature_map.shape[-2:] for feature_map in feature_maps]
-        image_size = input_image.shape[-2:]
         dtype, device = feature_maps[0].dtype, feature_maps[0].device
         strides = [
             [

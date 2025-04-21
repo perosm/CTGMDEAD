@@ -8,16 +8,21 @@ from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
 from torch.optim import Optimizer, Adam
 import torchvision.transforms.functional as F
-from utils.savers.Saver import Saver
-from utils.savers.LossSaver import LossSaver
-from utils.aggregators.Aggregator import Aggregator
-from utils.aggregators.LossAggregator import LossAggregator
+from utils.shared.savers.Saver import Saver
+from utils.shared.savers.LossSaver import LossSaver
+from utils.shared.aggregators.Aggregator import Aggregator
+from utils.shared.aggregators.LossAggregator import LossAggregator
 
 from dataset.kitti.KittiDataset import KittiDataset
 from model.resnet import ResNet18, ResNet
 from model.decoder import UnetDecoder
 from model.multi_task_network import MultiTaskNetwork
-from utils.losses import GradLoss, MaskedMAE, MultiTaskLoss, BinaryCrossEntropyLoss
+from utils.shared.losses import (
+    GradLoss,
+    MaskedMAE,
+    MultiTaskLoss,
+    BinaryCrossEntropyLoss,
+)
 
 
 def prepare_save_directories(args: dict, subfolder_name="train") -> None:

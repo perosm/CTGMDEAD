@@ -4,7 +4,11 @@ import pathlib
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from utils.visual_inspection import project_3d_bbox_to_image, draw_3d_bbox, draw_bbox
+from utils.shared.visual_inspection import (
+    project_3d_bbox_to_image,
+    draw_3d_bbox,
+    draw_bbox,
+)
 
 
 def main():
