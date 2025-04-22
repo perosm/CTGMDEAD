@@ -4,8 +4,8 @@ import torch
 import matplotlib.pyplot as plt
 import json
 
-from utils.aggregators.LossAggregator import LossAggregator
-from utils.savers.Saver import Saver
+from utils.shared.aggregators.LossAggregator import LossAggregator
+from utils.shared.savers.Saver import Saver
 
 
 class LossSaver(Saver):
@@ -40,5 +40,6 @@ class LossSaver(Saver):
         ax[0].plot(epochs_array, total_loss.cpu().numpy())
         ax[0].set_title("Losses")
         fig.legend()
-
+        plt.ioff()
         plt.savefig(self.save_dir / "losses.png")
+        plt.close()

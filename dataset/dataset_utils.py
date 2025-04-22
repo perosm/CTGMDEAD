@@ -90,13 +90,17 @@ def road_detection_load_util():
         ground_truth = torchvision.io.decode_image(png_file_path, mode="RGB").to(
             torch.float32
         )
-        mask = torch.where(
-            (ground_truth == SEMANTIC_SEGMENTATION_MAPPING["road"].view(3, 1, 1)).all(
-                dim=0
-            ),
-            1,
-            0,
-        ).unsqueeze(0)
+        mask = (
+            torch.where(
+                (
+                    ground_truth == SEMANTIC_SEGMENTATION_MAPPING["road"].view(3, 1, 1)
+                ).all(dim=0),
+                1,
+                0,
+            )
+            .unsqueeze(0)
+            .to(dtype=torch.float32)
+        )
         return mask
 
     return func

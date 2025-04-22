@@ -35,7 +35,7 @@ model:
     unfreeze_epoch: 10
   decoder:
     depth:
-      name: UnetDecoder
+      name: UnetDepthDecoder
       in_channels: 512
       channel_scale_factors: [2, 4, 8, 8]
       out_channels: 1

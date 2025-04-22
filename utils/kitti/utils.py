@@ -15,7 +15,8 @@ from utils.shared.aggregators.LossAggregator import LossAggregator
 
 from dataset.kitti.KittiDataset import KittiDataset
 from model.resnet import ResNet18, ResNet
-from model.decoder import UnetDecoder
+from model.depth_estimation.depth_decoder import UnetDepthDecoder
+from model.road_detection.road_detection_decoder import UnetRoadDetectionDecoder
 from model.multi_task_network import MultiTaskNetwork
 from utils.shared.losses import (
     GradLoss,
@@ -27,7 +28,7 @@ from utils.shared.losses import (
 
 def prepare_save_directories(args: dict, subfolder_name="train") -> None:
     save_dir = pathlib.Path(
-        os.path.join(args["save_path"], args["save_path"], subfolder_name)
+        os.path.join(args["save_path"], args["name"], subfolder_name)
     )
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -85,7 +86,10 @@ def _configure_encoder(encoder_configs: dict) -> nn.Module:
 
 def _configure_decoder(decoder_configs: dict) -> nn.Module:
     decoder_task = {}
-    decoder_dict = {UnetDecoder.__name__: UnetDecoder}
+    decoder_dict = {
+        UnetDepthDecoder.__name__: UnetDepthDecoder,
+        UnetRoadDetectionDecoder.__name__: UnetRoadDetectionDecoder,
+    }
     for task in decoder_configs.keys():
         decoder_task_configs = decoder_configs[task]
         decoder_task[task] = decoder_dict[decoder_task_configs["name"]](

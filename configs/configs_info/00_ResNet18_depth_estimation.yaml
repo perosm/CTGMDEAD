@@ -4,17 +4,12 @@ dataset:
   dataset_name: KittiDataset
   task_transform:
     input: 
-      # - Crop
+      - Crop
     depth:
-      # - Crop
-    road_detection:
-      # - Crop
-    object_detection_3d:
+      - Crop
   task_paths:
     input: "./data/kitti/input"
     depth: "./data/kitti/depth/train"
-    object_detection_3d: "./data/kitti/object_detection_3d/ground_truth"
-    # road_detection: "./data/kitti/semantic_segmentation"
 
 train:
   dataloader:
@@ -46,22 +41,12 @@ model:
       out_channels: 1
       freeze_epoch: None
       unfreeze_epoch: None
-    road_detection:
-      name: UnetRoadDetectionDecoder
-      in_channels: 512
-      channel_scale_factors: [2, 4, 8, 8]
-      out_channels: 1
-      freeze_epoch: 0
-      unfreeze_epoch: 10
-    # object_detection_3d:
 
 
 
 loss:
   depth: 
     - MaskedMAE
-  road_detection:
-    - BinaryCrossEntropyLoss
 
 optimizer:
   name: Adam
@@ -73,4 +58,4 @@ metrics:
   depth:
     - MaskedMAE
 
-save_path: ../run_info
+save_path: ~/faks/output/

@@ -37,7 +37,7 @@ class UnetLayer(nn.Module):
         return self.conv2(self.relu(self.conv1(x)))
 
 
-class UnetDecoder(nn.Module):
+class UnetDepthDecoder(nn.Module):
     def __init__(
         self,
         in_channels: int = 512,
@@ -80,13 +80,13 @@ class UnetDecoder(nn.Module):
 
 
 if __name__ == "__main__":
-    e0 = torch.zeros((1, 64, 128, 128))
-    e1 = torch.zeros((1, 64, 64, 64))
-    e2 = torch.zeros((1, 128, 32, 32))
-    e3 = torch.zeros((1, 256, 16, 16))
     e4 = torch.zeros((1, 512, 8, 8))
+    e3 = torch.zeros((1, 256, 16, 16))
+    e2 = torch.zeros((1, 128, 32, 32))
+    e1 = torch.zeros((1, 64, 64, 64))
+    e0 = torch.zeros((1, 64, 128, 128))
 
-    decoder = UnetDecoder()
+    decoder = UnetDepthDecoder()
     y = decoder(e4, e3, e2, e1, e0)
     gt = torch.zeros((1, 1, 256, 256))
 

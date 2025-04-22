@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from dataset.kitti.KittiDataset import KittiDataset
 from model.resnet import ResNet18
-from model.decoder import UnetDecoder
+from model.depth_estimation.depth_decoder import UnetDepthDecoder
 from model.encoder_decoder import DepthEncoderDecoder
 from utils.shared.metrics import (
     MaskedAverageRelativeError,
@@ -86,73 +86,75 @@ def save_n_worst_frames_per_metric(
 
 
 def eval():
-    dataset = KittiDataset(  # ../../datasets/kitti_data
-        task_paths={"input": "./data/kitti/input", "depth": "./data/kitti/depth/val"},
-        task_transform={
-            "input": [
-                "Crop",
-            ],
-            "depth": [
-                "Crop",
-            ],
-        },
-        camera="image_02",
-    )
-    eval_dataloader = DataLoader(
-        dataset=dataset, batch_size=1, shuffle=False, num_workers=1
-    )
-    encoder = ResNet18()
-    decoder = UnetDecoder()
+    # TODO:
+    # dataset = KittiDataset(  # ../../datasets/kitti_data
+    #     task_paths={"input": "./data/kitti/input", "depth": "./data/kitti/depth/val"},
+    #     task_transform={
+    #         "input": [
+    #             "Crop",
+    #         ],
+    #         "depth": [
+    #             "Crop",
+    #         ],
+    #     },
+    #     camera="image_02",
+    # )
+    # eval_dataloader = DataLoader(
+    #     dataset=dataset, batch_size=1, shuffle=False, num_workers=1
+    # )
+    # encoder = ResNet18()
+    # decoder = UnetDecoder()
 
-    model = DepthEncoderDecoder(encoder=encoder, decoder=decoder).to(DEVICE)
-    model.load_state_dict(torch.load("../run1/model.pth"))
-    model.eval()
+    # model = DepthEncoderDecoder(encoder=encoder, decoder=decoder).to(DEVICE)
+    # model.load_state_dict(torch.load("../run1/model.pth"))
+    # model.eval()
 
-    metrics = [
-        MaskedAverageRelativeError(),
-        MaskedRMSE(),
-        MaskedThresholdAccracy(),
-        MaskedMeanAbsoluteError(),
-    ]
-    metric_values = {metric.__class__.__name__: [] for metric in metrics}
-    # cnt = 0
-    for data in tqdm(eval_dataloader, "Eval..."):
-        with torch.no_grad():
-            pred = model(data["input"].to(DEVICE))
-            for metric in metrics:
-                metric_values[metric.__class__.__name__].append(
-                    metric(pred * DEPTH_MAX, data["depth"].to(DEVICE))
-                )
-        # if cnt != 0 and cnt % 4 == 0:
-        #     break
-        # cnt += 1
+    # metrics = [
+    #     MaskedAverageRelativeError(),
+    #     MaskedRMSE(),
+    #     MaskedThresholdAccracy(),
+    #     MaskedMeanAbsoluteError(),
+    # ]
+    # metric_values = {metric.__class__.__name__: [] for metric in metrics}
+    # # cnt = 0
+    # for data in tqdm(eval_dataloader, "Eval..."):
+    #     with torch.no_grad():
+    #         pred = model(data["input"].to(DEVICE))
+    #         for metric in metrics:
+    #             metric_values[metric.__class__.__name__].append(
+    #                 metric(pred * DEPTH_MAX, data["depth"].to(DEVICE))
+    #             )
+    #     # if cnt != 0 and cnt % 4 == 0:
+    #     #     break
+    #     # cnt += 1
 
-    save_dir = "../train_info/run1"
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    # save_dir = "../train_info/run1"
+    # if not os.path.exists(save_dir):
+    #     os.makedirs(save_dir)
 
-    worst_n_frames_per_metrics = {metric.__class__.__name__: [] for metric in metrics}
-    for metric in metrics:
-        _, indices = torch.topk(
-            torch.Tensor(metric_values[metric.__class__.__name__]),
-            k=3,
-            largest=metric.higher,
-            sorted=True,
-        )
-        worst_n_frames_per_metrics[metric.__class__.__name__].extend(
-            [index.item() for index in indices]
-        )
-    save_n_worst_frames_per_metric(model, dataset, worst_n_frames_per_metrics, save_dir)
-    metrics = {
-        metric.__class__.__name__: sum(metric_values[metric.__class__.__name__])
-        / len(metric_values[metric.__class__.__name__])
-        for metric in metrics
-    }
+    # worst_n_frames_per_metrics = {metric.__class__.__name__: [] for metric in metrics}
+    # for metric in metrics:
+    #     _, indices = torch.topk(
+    #         torch.Tensor(metric_values[metric.__class__.__name__]),
+    #         k=3,
+    #         largest=metric.higher,
+    #         sorted=True,
+    #     )
+    #     worst_n_frames_per_metrics[metric.__class__.__name__].extend(
+    #         [index.item() for index in indices]
+    #     )
+    # save_n_worst_frames_per_metric(model, dataset, worst_n_frames_per_metrics, save_dir)
+    # metrics = {
+    #     metric.__class__.__name__: sum(metric_values[metric.__class__.__name__])
+    #     / len(metric_values[metric.__class__.__name__])
+    #     for metric in metrics
+    # }
 
-    with open(os.path.join(save_dir, "metrics.json"), "w") as file:
-        json.dump(metrics, file)
+    # with open(os.path.join(save_dir, "metrics.json"), "w") as file:
+    #     json.dump(metrics, file)
 
     # TODO:
+    pass
 
 
 if __name__ == "__main__":

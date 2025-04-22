@@ -29,12 +29,12 @@ def train(args: dict):
     dataset = configure_dataset(args["dataset"])
     train_dataloader = configure_dataloader(args["train"]["dataloader"], dataset)
 
-    # model = configure_model(args["model"]).to(device)
+    model = configure_model(args["model"]).to(device)
     losses = configure_loss(args["loss"])
-    # optimizer = configure_optimizer(model, args["optimizer"])
+    optimizer = configure_optimizer(model, args["optimizer"])
     epochs = args["epochs"]
-    # freeze_model(model, args["model"], True, 0)
-    # model.train()
+    freeze_model(model, args["model"], True, 0)
+    model.train()
     loss_aggregator = LossAggregator(
         task_losses=losses.task_losses, epochs=epochs, num_batches=1, device=device
     )
@@ -43,19 +43,22 @@ def train(args: dict):
     data = next(iter(train_dataloader))
     data = {task: data[task].to(device) for task in data.keys()}
     for epoch in range(epochs):
-        # freeze_model(model, args["model"], False, epoch)
+        freeze_model(model, args["model"], False, epoch)
         # for data in tqdm(train_dataloader, f"Epoch {epoch}"):
-        # data = {task: data[task].to(device) for task in data.keys()}
-        plot_task_gt(data)
+        data = {task: data[task].to(device) for task in data.keys()}
+        # plot_task_gt(data)
 
-        # pred = model(data["input"])
-    # loss, per_batch_task_losses = losses(pred, data)
-    # loss.backward()
-    # optimizer.step()
-    # optimizer.zero_grad()
-    # loss_aggregator.aggregate_per_batch(per_batch_task_losses)
-    # loss_saver.save_plot()
-    # torch.save(model.state_dict(), save_dir / "model.pth")
+        pred = model(data["input"])
+        loss, per_batch_task_losses = losses(pred, data)
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        loss_aggregator.aggregate_per_batch(per_batch_task_losses)
+        print(epoch)
+
+    loss_saver.save_plot()
+    plot_task_gt({"input": data["input"], "road_detection": pred["road_detection"]})
+    torch.save(model.state_dict(), save_dir / "model.pth")
 
     return
 

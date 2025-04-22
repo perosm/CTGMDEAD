@@ -1,11 +1,11 @@
 import torch
 from torch import nn
 from model.resnet import ResNet, ResNet18
-from model.decoder import UnetDecoder
+from model.depth_estimation.depth_decoder import UnetDepthDecoder
 
 
 class DepthEncoderDecoder(nn.Module):
-    def __init__(self, encoder: ResNet, decoder: UnetDecoder):
+    def __init__(self, encoder: ResNet, decoder: UnetDepthDecoder):
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
@@ -18,7 +18,7 @@ class DepthEncoderDecoder(nn.Module):
 
 
 class EncoderDecoder(nn.Module):
-    def __init__(self, encoder: ResNet, decoder: UnetDecoder):
+    def __init__(self, encoder: ResNet, decoder: UnetDepthDecoder):
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
@@ -33,7 +33,7 @@ class EncoderDecoder(nn.Module):
 if __name__ == "__main__":
     device = "cuda"
     encoder = ResNet18()
-    decoder = UnetDecoder()
+    decoder = UnetDepthDecoder()
     autoencoder = DepthEncoderDecoder(encoder=encoder, decoder=decoder).to(device)
 
     x = torch.zeros((1, 3, 256, 256)).to(device)

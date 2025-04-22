@@ -1,7 +1,7 @@
 import os
 import abc
 import pathlib
-from utils.aggregators.Aggregator import Aggregator
+from utils.shared.aggregators.Aggregator import Aggregator
 
 
 class Saver(abc.ABC):

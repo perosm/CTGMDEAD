@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from utils.aggregators.Aggregator import Aggregator
+from utils.shared.aggregators.Aggregator import Aggregator
 
 
 class MetricsAggregator(Aggregator):

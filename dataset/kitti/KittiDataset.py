@@ -32,7 +32,8 @@ class KittiDataset(Dataset):
         self.camera = camera
         self.camera_index = int(camera[-1])
         self._load_data_paths()
-        self._fetch_projection_matrices()
+        if KITTIutils.TaskEnum.object_detection_3d.name in self.task_paths.keys():
+            self._fetch_projection_matrices()
         self._filter_data_paths()
         self.load_functions = KITTIutils.load_utils(list(self.paths_dict.keys()))
 
