@@ -5,11 +5,10 @@ dataset:
   task_transform:
     input: 
       # - Crop
-    object_detection_3d:
+    object_detection_2d:
   task_paths:
-    input: "./data/kitti/input_object_detection_3d"
-    object_detection_3d: "./data/kitti/object_detection_3d"
-    # calibration_files: "./"
+    input: "./data/kitti/input"
+    object_detection_2d: "./data/kitti/object_detection_3d/ground_truth"
 
 train:
   dataloader:
@@ -41,28 +40,24 @@ model:
       out_channels: 1
       freeze_epoch: None
       unfreeze_epoch: None
-    object_detection_3d:
-      anchor_generator:
-        name: AnchorGenerator
-        image_shape: # TODO: set to NEW_H, NEW_W
-          - 375
-          - 1242
-        sizes:
-          - 32
-          - 64
-          - 128
-          - 256 # in paper they use 126; mistake?
-          - 512
-        ratios:
-          - 0.5
-          - 1
-          - 2
-      
-        
-      
-      
-
-
+  necks_and_heads:
+    object_detection_2d:
+      name: FPNFasterRCNN
+      image_size: [375, 1242] # TODO: set to NEW_H, NEW_W for KITTI
+      rpn:
+        - training: True
+        - num_channels_per_feature_map: [64, 256, 512, 512]
+        - objectness_threshold: 0.3
+        - iou_threshold: 0.7
+        - top_k_proposals_training: 2000
+        - top_k_proposals_testing: 300
+        - anchor_generator:
+          - sizes: [64, 128, 256, 512]
+          - aspect_ratios: [0.5, 1, 2]
+        - rpn_head:
+          - number_of_object_proposals_per_anchor: 3
+      roi_network:
+        - pool_output_size: [7, 7]
 
 loss:
   depth: 

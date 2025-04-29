@@ -17,7 +17,9 @@ from dataset.kitti.KittiDataset import KittiDataset
 from model.resnet import ResNet18, ResNet
 from model.depth_estimation.depth_decoder import UnetDepthDecoder
 from model.road_detection.road_detection_decoder import UnetRoadDetectionDecoder
+from model.object_detection.fpn_faster_rcnn import FPNFasterRCNN
 from model.multi_task_network import MultiTaskNetwork
+from utils.shared.enums import TaskEnum
 from utils.shared.losses import (
     GradLoss,
     MaskedMAE,
@@ -71,8 +73,11 @@ def configure_savers(
 ############################## MODEL UTILS ##############################
 def configure_model(model_configs: dict) -> nn.Module:
     encoder = _configure_encoder(model_configs["encoder"])
-    decoders = _configure_decoder(model_configs["decoder"])
-    model = MultiTaskNetwork(encoder, decoders)
+    decoder = _configure_decoder(model_configs["decoder"])
+    necks_and_heads = _configure_necks_and_heads(model_configs["necks_and_heads"])
+    model = MultiTaskNetwork(
+        encoder=encoder, decoder=decoder, heads_and_necks=necks_and_heads
+    )
     print_model_size(model)
 
     return model
@@ -98,7 +103,21 @@ def _configure_decoder(decoder_configs: dict) -> nn.Module:
             decoder_task_configs["out_channels"],
         )
 
-    return decoder_task
+    return decoder_dict
+
+
+def _configure_necks_and_heads(necks_and_heads_configs: dict) -> nn.Module:
+    necks_and_heads = {}
+    necks_and_heads_dict = {FPNFasterRCNN.__name__: FPNFasterRCNN}
+
+    for task in necks_and_heads_configs.keys():
+        necks_and_heads_info = necks_and_heads_configs[task]
+        name = necks_and_heads_info.pop("name")
+        necks_and_heads[task] = necks_and_heads_dict[name](
+            necks_and_heads_configs[task]
+        )
+
+    return necks_and_heads
 
 
 def print_model_size(model: nn.Module) -> None:

@@ -1,6 +1,9 @@
 import torch
 from torch import nn
 from torchvision.ops import clip_boxes_to_image, nms
+from model.object_detection.anchor_generator import AnchorGenerator
+
+from utils.shared.dict_utils import list_of_dict_to_dict
 
 
 class RPNHead(nn.Module):
@@ -80,19 +83,23 @@ class RegionProposalNetwork(nn.Module):
 
     def __init__(
         self,
-        num_channels_per_feature_map: list[int],
-        anchor_generator: AnchorGenerator,
-        training: bool,
-        image_size: tuple[int, int],
-        objectness_threshold: float = 0.3,
-        iou_threshold: float = 0.7,
-        top_k_proposals_training: int = 2000,
-        top_k_proposals_testing: int = 300,
+        configs: list[dict],
     ) -> None:
         """
         Region Proposal Network (RPN) is used to predict whether an object exists
         """
         super().__init__()
+        self.num_channels_per_feature_map = configs["num_channels_per_feature_map"]
+        self.training = configs["training"]
+        self.image_size = configs["image_size"]
+        self.objectness_threshold = configs["objectness_threshold"]
+        self.iou_threshold = configs["iou_threshold"]
+        self.top_k_proposals_training = configs["top_k_proposals_training"]
+        self.top_k_proposals_testing = configs["top_k_proposals_testing"]
+
+        self.anchor_generator = self._configure_anchor_generator(
+            anchor_generator_config=configs["anchor_generator"]
+        )
         self.conv = nn.ModuleDict(
             {
                 f"fpn_{i+1}": nn.Conv2d(
@@ -101,17 +108,33 @@ class RegionProposalNetwork(nn.Module):
                     kernel_size=3,
                     padding=1,
                 )
-                for i, num_channels in enumerate(num_channels_per_feature_map)
+                for i, num_channels in enumerate(self.num_channels_per_feature_map)
             }
         )
-        self.rpn_head = RPNHead()
-        self.anchor_generator = anchor_generator
-        self.training = training
-        self.image_size = image_size
-        self.objectness_threshold = objectness_threshold
-        self.iou_threshold = iou_threshold
-        self.top_k_proposals_training = top_k_proposals_training
-        self.top_k_proposals_testing = top_k_proposals_testing
+        self.rpn_head = self._configure_rpn_head(rpn_head_config=configs["rpn_head"])
+
+    def _configure_anchor_generator(
+        self, anchor_generator_config: list[dict]
+    ) -> AnchorGenerator:
+        anchor_generator_config = list_of_dict_to_dict(
+            list_of_dicts=anchor_generator_config, new_dict={}, depth_cnt=1
+        )
+        sizes = tuple((size) for size in anchor_generator_config["sizes"])
+        aspect_ratios = tuple(
+            (aspect_ratio) for aspect_ratio in anchor_generator_config["sizes"]
+        )
+        return AnchorGenerator(aspect_ratios=aspect_ratios, sizes=sizes)
+
+    def _configure_rpn_head(self, rpn_head_config: list[dict]) -> RPNHead:
+        rpn_head_config = list_of_dict_to_dict(
+            list_of_dicts=rpn_head_config, new_dict={}, depth_cnt=1
+        )
+        number_of_object_proposals_per_anchor = rpn_head_config[
+            "number_of_object_proposals_per_anchor"
+        ]
+        return RPNHead(
+            number_of_object_proposals_per_anchor=number_of_object_proposals_per_anchor
+        )
 
     def _fetch_proposals(
         self, anchors: torch.Tensor, bbox_regression_deltas: torch.Tensor

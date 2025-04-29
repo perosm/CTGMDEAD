@@ -2,31 +2,33 @@ import torch
 from torch import nn
 from model.object_detection.rpn import RegionProposalNetwork
 from model.object_detection.roi import ROINetwork
-from model.object_detection.anchor_generator import AnchorGenerator
+from utils.shared.dict_utils import list_of_dict_to_dict
 
 
 class FPNFasterRCNN(nn.Module):
-    def __init__(self, num_channels_per_feature_map: list[int], training: bool = True):
+    def __init__(self, configs: dict):
         super().__init__()
-        self.rpn = RegionProposalNetwork(
-            num_channels_per_feature_map
+        self.image_size = configs["image_size"]
+        self.rpn = self._configure_region_proposal_network(
+            rpn_config=configs["rpn"]
         )  # TODO: add per feature map RegionProposalNetwork?
-        self.anchor_generator = AnchorGenerator(
-            sizes=(  # TODO: which anchor sizes to choose?
-                (512),
-                (256),
-                (128),
-                (64),  # (32)
-            ),
-            aspect_ratios=(
-                (0.5, 1.0, 2.0),
-                (0.5, 1.0, 2.0),
-                (0.5, 1.0, 2.0),
-                (0.5, 1.0, 2.0),
-            ),
+        self.roi = self._configure_roi_network(roi_config=configs["roi_network"])
+
+    def _configure_region_proposal_network(
+        self, rpn_config: list[dict]
+    ) -> RegionProposalNetwork:
+        rpn_config.append({"image_size": self.image_size})
+        rpn_config = list_of_dict_to_dict(
+            list_of_dicts=rpn_config, new_dict={}, depth_cnt=1
         )
-        self.roi = ROINetwork()
-        self.training = training
+        return RegionProposalNetwork(configs=rpn_config)
+
+    def _configure_roi_network(self, roi_config: list[dict]) -> ROINetwork:
+        roi_config = list_of_dict_to_dict(
+            list_of_dicts=roi_config, new_dict={}, depth_cnt=1
+        )
+        pool_output_size = roi_config["pool_output_size"]
+        return ROINetwork(image_size=self.image_size, pool_output_size=pool_output_size)
 
     def forward(
         self,

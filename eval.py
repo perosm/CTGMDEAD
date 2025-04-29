@@ -13,7 +13,6 @@ from tqdm import tqdm
 from dataset.kitti.KittiDataset import KittiDataset
 from model.resnet import ResNet18
 from model.depth_estimation.depth_decoder import UnetDepthDecoder
-from model.encoder_decoder import DepthEncoderDecoder
 from utils.shared.metrics import (
     MaskedAverageRelativeError,
     MaskedRMSE,

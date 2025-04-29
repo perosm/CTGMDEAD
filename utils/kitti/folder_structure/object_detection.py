@@ -15,9 +15,9 @@ def main():
     args = _parse_args()
 
     input_images_dir = args.input_images_dir
-    mapping_path = args.devkit_object_detection_3d_mapping
-    ground_truth_dir = args.label_object_detection_3d
-    calibration_dir = args.object_detection_3d_calibration
+    mapping_path = args.devkit_object_detection_mapping
+    ground_truth_dir = args.label_object_detection
+    calibration_dir = args.object_detection_calibration
     destination_root_folder = args.destination_root_folder
 
     with open(mapping_path / "train_mapping.txt", "r") as file:
@@ -130,32 +130,32 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "-lod",
-        "--label-object-detection-3d",
+        "--label-object-detection",
         type=pathlib.Path,
         default=pathlib.Path(
             "./data/kitti/data_object_label_2/training/label_2"
         ),  # left camera images
-        help="Path to 3d object detection ground truth.",
+        help="Path to object detection ground truth.",
     )
     parser.add_argument(
         "-odc",
-        "--object-detection-3d-calibration",
+        "--object-detection-calibration",
         type=pathlib.Path,
         default=pathlib.Path(
             "./data/kitti/data_object_calib/training/calib"
         ),  # left camera images
-        help="Path to 3d object detection calibration files.",
+        help="Path to object detection calibration files.",
     )
     parser.add_argument(
         "-drf",
         "--destination-root-folder",
         type=pathlib.Path,
-        default=pathlib.Path("./data/kitti/object_detection_3d"),
+        default=pathlib.Path("./data/kitti/object_detection"),
         help="Destination root folder for all the corresponding files.",
     )
     parser.add_argument(
         "-dodm",
-        "--devkit-object-detection-3d-mapping",
+        "--devkit-object-detection-mapping",
         type=pathlib.Path,
         default=pathlib.Path("./data/kitti/devkit_object/mapping"),
         help="Path to mapping folder. Contains information how to map labels to raw data.",

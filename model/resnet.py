@@ -3,7 +3,6 @@ from torch import nn
 
 from typing import Union, List
 import torchvision
-import utils.kitti.utils
 
 
 # TODO: will BottleNeck block be used since we are going with ResNets < ResNet50 ?
@@ -187,15 +186,15 @@ class ResNet(nn.Module):
     def forward(
         self, x: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        e0 = self.relu(self.bn1(self.conv1(x)))
-        out = self.maxpool(e0)
-        e1 = self.layer1(out)
-        e2 = self.layer2(e1)
-        e3 = self.layer3(e2)
-        e4 = self.layer4(e3)
-        # y = self.fc(self.avgpool(e4).squeeze(3).squeeze(2))
+        encoder_output = {}
+        encoder_output["e0"] = self.relu(self.bn1(self.conv1(x)))
+        out = self.maxpool(encoder_output["e0"])
+        encoder_output["e1"] = self.layer1(out)
+        encoder_output["e2"] = self.layer2(encoder_output["e1"])
+        encoder_output["e3"] = self.layer3(encoder_output["e2"])
+        encoder_output["e4"] = self.layer4(encoder_output["e3"])
 
-        return e0, e1, e2, e3, e4  # y
+        return encoder_output
 
 
 def ResNet18(pretrained: bool = True) -> ResNet:

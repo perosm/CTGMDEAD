@@ -8,15 +8,10 @@ import torchvision
 from torchvision import transforms
 import torchvision.transforms.functional as F
 
+from utils.shared.enums import TaskEnum
+
 KITTI_H, KITTI_W = 375, 1242
 NEW_H, NEW_W = 256, 1184
-
-
-class TaskEnum(enum.StrEnum):
-    input = "input"
-    depth = "depth"
-    road_detection = "road_detection"
-    object_detection_3d = "object_detection_3d"
 
 
 def task_check_file_extension(task: str, file_path: str):
@@ -27,6 +22,7 @@ def task_check_file_extension(task: str, file_path: str):
         TaskEnum.input: [".png"],
         TaskEnum.depth: [".png"],
         TaskEnum.road_detection: [".png"],
+        TaskEnum.object_detection_2d: [".txt"],
         TaskEnum.object_detection_3d: [".txt"],
     }
 
@@ -165,6 +161,7 @@ def load_utils(tasks: list[str]) -> dict:
         TaskEnum.input: input_load_util(),
         TaskEnum.depth: depth_load_util(),
         TaskEnum.road_detection: road_detection_load_util(),
+        TaskEnum.object_detection_2d: object_detection_3d_load_util(),  # TODO: make according chanes
         TaskEnum.object_detection_3d: object_detection_3d_load_util(),
     }
     return {task: task_load_type[task] for task in tasks}
