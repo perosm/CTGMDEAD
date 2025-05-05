@@ -2,58 +2,111 @@ import torch
 from torch import nn
 from model.object_detection.rpn import RegionProposalNetwork
 from model.object_detection.roi import ROINetwork
+from model.object_detection.output_heads import OutputHeads
 from utils.shared.dict_utils import list_of_dict_to_dict
+
+
+class FPNFasterRCNNLinkerBlock(nn.Module):
+    def __init__(
+        self, num_channels_per_feature_map: list[int], out_channels: int = 256
+    ) -> None:
+        """
+        When using Faster R-CNN with Feature Pyramid Network (FPN) a problem occurs if we want to reuse the MultiScaleRoIAlign
+        https://pytorch.org/vision/main/generated/torchvision.ops.MultiScaleRoIAlign.html.
+        In order to fix that, a so called "Linker block" is added to "link" FPN with Faster R-CNN part of the network.
+
+        Args:
+            - num_channels_per_feature_map: List of ints representing number of channels per FPN output.
+            - out_channels: Integer representing number of output channels after Linker block. Default value is 256.
+        """
+        super().__init__()
+        self.num_channels_per_feature_map = num_channels_per_feature_map
+        self.out_channels = out_channels
+        self.linker_blocks = nn.ModuleDict(
+            {
+                f"fpn{i}": nn.Sequential(
+                    nn.Conv2d(
+                        in_channels=num_channels,
+                        out_channels=self.out_channels,
+                        kernel_size=3,
+                        padding=1,
+                    ),
+                    nn.BatchNorm2d(num_features=self.out_channels),
+                    nn.ReLU(),
+                )
+                for i, num_channels in enumerate(self.num_channels_per_feature_map)
+            }
+        )
+
+    def forward(self, fpn_outputs: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        linked_fpn_outputs = {}
+        fpn_names = fpn_outputs.keys()
+        for fpn_name in fpn_names:
+            linked_fpn_outputs[fpn_name] = self.linker_blocks[fpn_name](
+                fpn_outputs[fpn_name]
+            )
+
+        return linked_fpn_outputs
 
 
 class FPNFasterRCNN(nn.Module):
     def __init__(self, configs: dict):
         super().__init__()
         self.image_size = configs["image_size"]
-        self.rpn = self._configure_region_proposal_network(
-            rpn_config=configs["rpn"]
-        )  # TODO: add per feature map RegionProposalNetwork?
-        self.roi = self._configure_roi_network(roi_config=configs["roi_network"])
+        self.pool_output_size = configs["pool_output_size"]
+        self.num_channels_per_feature_map = configs["num_channels_per_feature_map"]
+        self.out_channels = configs["out_channels"]
+        self.linker_layer = self._configure_linker_layer(
+            num_channels_per_feature_map=self.num_channels_per_feature_map,
+            out_channels=self.out_channels,
+        )
+        # TODO: add per feature map RegionProposalNetwork?
+        self.rpn = self._configure_region_proposal_network(rpn_config=configs["rpn"])
+        self.roi = self._configure_roi_network(roi_config=configs["roi"])
+        self.output_heads = self._configure_output_heads(config=configs)
+
+    def _configure_linker_layer(
+        self, num_channels_per_feature_map: list[int], out_channels: int
+    ) -> FPNFasterRCNNLinkerBlock:
+        return FPNFasterRCNNLinkerBlock(
+            num_channels_per_feature_map=num_channels_per_feature_map,
+            out_channels=out_channels,
+        )
 
     def _configure_region_proposal_network(
         self, rpn_config: list[dict]
     ) -> RegionProposalNetwork:
         rpn_config.append({"image_size": self.image_size})
+        rpn_config.append({"num_fpn_outputs": len(self.num_channels_per_feature_map)})
+        rpn_config.append({"num_channels": self.out_channels})
         rpn_config = list_of_dict_to_dict(
             list_of_dicts=rpn_config, new_dict={}, depth_cnt=1
         )
         return RegionProposalNetwork(configs=rpn_config)
 
     def _configure_roi_network(self, roi_config: list[dict]) -> ROINetwork:
-        roi_config = list_of_dict_to_dict(
-            list_of_dicts=roi_config, new_dict={}, depth_cnt=1
+        roi_config = list_of_dict_to_dict(roi_config, new_dict={}, depth_cnt=1)
+        return ROINetwork(
+            image_size=self.image_size,
+            pool_output_size=self.pool_output_size,
+            feature_map_names=roi_config["feature_map_names"],
+            sampling_ratio=roi_config["sampling_ratio"],
         )
-        pool_output_size = roi_config["pool_output_size"]
-        return ROINetwork(image_size=self.image_size, pool_output_size=pool_output_size)
 
-    def forward(
-        self,
-        encoder_outputs: tuple[torch.Tensor, ...],
-        decoder_outputs: tuple[torch.Tensor, ...],
-        y_true: torch.Tensor,
-    ) -> torch.Tensor:
-        fpn_outputs = {}
-        for i in range(len(encoder_outputs)):
-            fpn_outputs[f"fpn_{i}"] = (
-                encoder_outputs[i]
-                + decoder_outputs[
-                    len(encoder_outputs) - i - 1
-                ]  # TODO: needs a bit of change :)
-            )
+    def _configure_output_heads(self, config: dict) -> OutputHeads:
+        return OutputHeads(
+            pool_size=config["pool_output_size"], num_classes=config["num_classes"]
+        )
 
-        if self.training:
-            objectness_score_per_feature_map, proposals_per_feature_map = self.rpn(
-                fpn_outputs, y_true
-            )
-        else:
-            objectness_score_per_feature_map, proposals_per_feature_map = self.rpn(
-                fpn_outputs
-            )
+    def forward(self, fpn_outputs: dict[str, torch.Tensor]) -> torch.Tensor:
+        fpn_outputs = self.linker_layer(fpn_outputs=fpn_outputs)
+        objectness_scores, proposals = self.rpn(fpn_feature_map_outputs=fpn_outputs)
 
-        class_logits, bounding_box_deltas = self.roi(proposals_per_feature_map)
+        pooled_proposals = self.roi(
+            fpn_feature_map_outputs=fpn_outputs,
+            proposals=proposals,
+        )
 
-        return class_logits, bounding_box_deltas
+        class_logits, bounding_box_offsets = self.output_heads(pooled_proposals)
+
+        return class_logits, bounding_box_offsets

@@ -137,9 +137,10 @@ def object_detection_3d_load_util():
             gt[object_index, 2] = object_info[2]  # occluded flag
             gt[object_index, 3] = object_info[3]  # observation angle
             gt[object_index, 4:8] = [
-                float(image_coord) for image_coord in object_info[4:8]
+                float(image_coord)
+                for image_coord in object_info[4:8]  # left, top, right, bottom
             ]  # 2d bbox image coordinates
-            # gt[object_index, 4] -= KITTI_H - NEW_H  # top
+            # gt[object_index, 4] -= KITTI_H - NEW_H  # left
             # gt[object_index, 5] -= (KITTI_W - NEW_W) / 2  # left
             # gt[object_index, 6] -= KITTI_H - NEW_H  # bottom
             # gt[object_index, 7] -= (KITTI_W - NEW_W) / 2  # top

@@ -36,6 +36,18 @@ class RPNHead(nn.Module):
             * number_of_object_proposals_per_anchor,
             kernel_size=1,
         )
+        self._init_weights()
+
+    def _init_weights(self):
+        """
+        In the original paper they initialize the weights of the RPN module by drawing
+        weights from a zero-mean Gaussian distribution with standard deviation 0.01.
+        """
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d):
+                nn.init.normal_(module.weight, mean=0, std=0.01)
+                if module.bias is not None:
+                    nn.init.normal_(module.bias, mean=0, std=0.01)
 
     def _format_objectness_and_bbox_regression_deltas(
         self, objectness_score: torch.Tensor, bbox_regression_deltas: torch.Tensor
@@ -65,7 +77,6 @@ class RPNHead(nn.Module):
         return objectness_score, bbox_regression_deltas
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        N = x.shape[0]
         objectness_score = self.detection_head(x)
         bbox_regression_deltas = self.regression_head(x)
 
@@ -79,7 +90,6 @@ class RPNHead(nn.Module):
 
 
 class RegionProposalNetwork(nn.Module):
-    out_channels = 256
 
     def __init__(
         self,
@@ -89,7 +99,6 @@ class RegionProposalNetwork(nn.Module):
         Region Proposal Network (RPN) is used to predict whether an object exists
         """
         super().__init__()
-        self.num_channels_per_feature_map = configs["num_channels_per_feature_map"]
         self.training = configs["training"]
         self.image_size = configs["image_size"]
         self.objectness_threshold = configs["objectness_threshold"]
@@ -100,18 +109,26 @@ class RegionProposalNetwork(nn.Module):
         self.anchor_generator = self._configure_anchor_generator(
             anchor_generator_config=configs["anchor_generator"]
         )
-        self.conv = nn.ModuleDict(
+        self.conv = self._configure_shared_conv_layer(
+            num_channels=configs["num_channels"],
+            num_fpn_outputs=configs["num_fpn_outputs"],
+        )
+        self.rpn_head = self._configure_rpn_head(rpn_head_config=configs["rpn_head"])
+
+    def _configure_shared_conv_layer(
+        self, num_channels: int, num_fpn_outputs: int
+    ) -> nn.Module:
+        return nn.ModuleDict(
             {
-                f"fpn_{i+1}": nn.Conv2d(
+                f"fpn{i}": nn.Conv2d(
                     in_channels=num_channels,
-                    out_channels=self.out_channels,
+                    out_channels=num_channels,
                     kernel_size=3,
                     padding=1,
                 )
-                for i, num_channels in enumerate(self.num_channels_per_feature_map)
+                for i in range(num_fpn_outputs)
             }
         )
-        self.rpn_head = self._configure_rpn_head(rpn_head_config=configs["rpn_head"])
 
     def _configure_anchor_generator(
         self, anchor_generator_config: list[dict]
@@ -119,10 +136,9 @@ class RegionProposalNetwork(nn.Module):
         anchor_generator_config = list_of_dict_to_dict(
             list_of_dicts=anchor_generator_config, new_dict={}, depth_cnt=1
         )
-        sizes = tuple((size) for size in anchor_generator_config["sizes"])
-        aspect_ratios = tuple(
-            (aspect_ratio) for aspect_ratio in anchor_generator_config["sizes"]
-        )
+        sizes = anchor_generator_config["sizes"]
+        aspect_ratios = anchor_generator_config["aspect_ratios"]
+
         return AnchorGenerator(aspect_ratios=aspect_ratios, sizes=sizes)
 
     def _configure_rpn_head(self, rpn_head_config: list[dict]) -> RPNHead:
@@ -150,7 +166,7 @@ class RegionProposalNetwork(nn.Module):
             - proposals:
         """
         # corners of the anchors
-        x1, y1, x2, y2 = anchors.unbind(dim=-1)
+        x1, y1, x2, y2 = anchors.unbind(dim=-1)  # left, top, right, bottom
         anchor_width = x2 - x1
         anchor_height = y2 - y1
         anchor_center_x = y1 + anchor_width / 2
@@ -182,59 +198,53 @@ class RegionProposalNetwork(nn.Module):
         """
         Proposals per feature map are being filtered in the following order:
             - 1) Clip proposals to fit into image
-            - 2) Filter degenerate proposals TODO: this should not be neccessary?
-            - 3) Proposals with objectness_score < objectness_threshold
-            - 4) Non-Max Supression (NMS) between proposals for the same ground truth
-            - 5) Pick top K proposals
+            - 2) Proposals with objectness_score < objectness_threshold
+            - 3) Non-Max Supression (NMS) between proposals for the same ground truth
+            - 4) Pick top K proposals
 
         Args:
         """
         # TODO: Make it work for N > 1
-        N = objectness_score.shape[0]
         # 1) clip proposals
         proposals = clip_boxes_to_image(boxes=proposals, size=self.image_size)
-        proposals = proposals.repeat(N, 1, 1)
 
-        # 2) filter degenerate proposals after clipping
-        proposal_heights = proposals[..., 2] - proposals[..., 0]
-        proposal_widths = proposals[..., 3] - proposals[..., 1]
-        keep = (proposal_heights > 0) & (proposal_widths > 0)
-        proposals = proposals[keep]
-        objectness_score = objectness_score[keep]
-
-        # 3) filter proposals with objectness_score < objectness_threshold
+        # 2) filter proposals with objectness_score < objectness_threshold
+        # reject negatives -> they don't contain an object
         keep = objectness_score > self.objectness_threshold
         proposals = proposals[keep]
         objectness_score = objectness_score[keep]
 
-        # 4) filter using NMS
+        # TODO: REMOVE
+        # only for debugging purposes
+        num = min(proposals.shape[0], 100000)
+        proposals = proposals[:num]
+        objectness_score = objectness_score[:num]
+
+        # 3) filter using NMS
         keep = nms(
             boxes=proposals, scores=objectness_score, iou_threshold=self.iou_threshold
         )
+
+        # 4) pick top K proposals
+        top_k = min(
+            (
+                self.top_k_proposals_training
+                if self.training
+                else self.top_k_proposals_testing
+            ),
+            keep.numel(),
+        )
+        keep = keep[:top_k]
+
         proposals = proposals[keep]
         objectness_score = objectness_score[keep]
-
-        # 5) pick top K proposals
-        top_k = (
-            self.top_k_proposals_training
-            if self.training
-            else self.top_k_proposals_testing
-        )
-        _, indices = torch.topk(
-            objectness_score, k=min(top_k, objectness_score.numel())
-        )
-
-        proposals = proposals[indices]
-        objectness_score = objectness_score[indices]
 
         return objectness_score, proposals
 
     def forward(
-        self,
-        fpn_feature_map_outputs: dict[str, torch.Tensor],
-        y_true: torch.Tensor | None,
+        self, fpn_feature_map_outputs: dict[str, torch.Tensor]
     ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
-        objectness_score_per_feature_map, proposals_per_feature_map = {}, {}
+        all_objectness_scores, all_proposals = [], []
         all_anchors, num_anchors_per_feature_map = self.anchor_generator(
             self.image_size, list(fpn_feature_map_outputs.values())
         )
@@ -256,10 +266,10 @@ class RegionProposalNetwork(nn.Module):
                 proposals=proposals,
                 objectness_score=objectness_score,
             )
-            objectness_score_per_feature_map[fpn_feature_map_name] = objectness_score
-            proposals_per_feature_map[fpn_feature_map_name] = proposals
+            all_objectness_scores.append(objectness_score)
+            all_proposals.append(proposals)
 
-        return objectness_score_per_feature_map, proposals_per_feature_map
+        return torch.cat(all_objectness_scores), torch.cat(all_proposals)
 
 
 if __name__ == "__main__":
@@ -281,10 +291,10 @@ if __name__ == "__main__":
     ).to(DEVICE)
     input_image = torch.zeros((1, 3, 256, 1184)).to(DEVICE)
     feature_maps = {
-        # "fpn_1": torch.zeros((1, 64, 128, 592)).to(DEVICE),
-        "fpn_2": torch.zeros((1, 128, 64, 296)).to(DEVICE),
-        "fpn_3": torch.zeros((1, 256, 32, 148)).to(DEVICE),
-        "fpn_4": torch.zeros((1, 512, 16, 74)).to(DEVICE),
+        # "fpn1": torch.zeros((1, 64, 128, 592)).to(DEVICE),
+        "fpn2": torch.zeros((1, 128, 64, 296)).to(DEVICE),
+        "fpn3": torch.zeros((1, 256, 32, 148)).to(DEVICE),
+        "fpn4": torch.zeros((1, 512, 16, 74)).to(DEVICE),
     }
     rpn = RegionProposalNetwork(
         num_channels_per_feature_map=num_channels_per_feature_map,
@@ -292,5 +302,4 @@ if __name__ == "__main__":
         image_size=input_image.shape[-2:],
         training=True,
     ).to(DEVICE)
-    y_true = torch.arange(15).to(DEVICE)
-    rpn(feature_maps, y_true)
+    rpn(feature_maps)

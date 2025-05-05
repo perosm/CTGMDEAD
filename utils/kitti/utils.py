@@ -71,10 +71,12 @@ def configure_savers(
 
 
 ############################## MODEL UTILS ##############################
-def configure_model(model_configs: dict) -> nn.Module:
-    encoder = _configure_encoder(model_configs["encoder"])
-    decoder = _configure_decoder(model_configs["decoder"])
-    necks_and_heads = _configure_necks_and_heads(model_configs["necks_and_heads"])
+def configure_model(model_configs: dict, device: torch.device) -> nn.Module:
+    encoder = _configure_encoder(model_configs["encoder"]).to(device)
+    decoder = _configure_decoder(model_configs["decoder"]).to(device)
+    necks_and_heads = _configure_necks_and_heads(
+        model_configs["necks_and_heads"], device
+    )
     model = MultiTaskNetwork(
         encoder=encoder, decoder=decoder, heads_and_necks=necks_and_heads
     )
@@ -90,23 +92,18 @@ def _configure_encoder(encoder_configs: dict) -> nn.Module:
 
 
 def _configure_decoder(decoder_configs: dict) -> nn.Module:
-    decoder_task = {}
-    decoder_dict = {
-        UnetDepthDecoder.__name__: UnetDepthDecoder,
-        UnetRoadDetectionDecoder.__name__: UnetRoadDetectionDecoder,
-    }
-    for task in decoder_configs.keys():
-        decoder_task_configs = decoder_configs[task]
-        decoder_task[task] = decoder_dict[decoder_task_configs["name"]](
-            decoder_task_configs["in_channels"],
-            decoder_task_configs["channel_scale_factors"],
-            decoder_task_configs["out_channels"],
-        )
+    decoder_dict = {UnetDepthDecoder.__name__: UnetDepthDecoder}
 
-    return decoder_dict
+    return decoder_dict[decoder_configs["name"]](
+        decoder_configs["in_channels"],
+        decoder_configs["channel_scale_factors"],
+        decoder_configs["out_channels"],
+    )
 
 
-def _configure_necks_and_heads(necks_and_heads_configs: dict) -> nn.Module:
+def _configure_necks_and_heads(
+    necks_and_heads_configs: dict, device: torch.device
+) -> nn.Module:
     necks_and_heads = {}
     necks_and_heads_dict = {FPNFasterRCNN.__name__: FPNFasterRCNN}
 
@@ -115,7 +112,7 @@ def _configure_necks_and_heads(necks_and_heads_configs: dict) -> nn.Module:
         name = necks_and_heads_info.pop("name")
         necks_and_heads[task] = necks_and_heads_dict[name](
             necks_and_heads_configs[task]
-        )
+        ).to(device)
 
     return necks_and_heads
 
@@ -149,7 +146,7 @@ def freeze_model(
         freeze_params(model.encoder, freeze)
 
     for task in model_configs["decoder"].keys():
-        if model_configs["decoder"][task][command] == epoch:
+        if model_configs["decoder"][command] == epoch:
             freeze_params(model.decoders[task], freeze)
 
 

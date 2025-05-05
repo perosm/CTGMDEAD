@@ -4,7 +4,7 @@ dataset:
   dataset_name: KittiDataset
   task_transform:
     input: 
-      # - Crop
+      - Crop
     object_detection_2d:
   task_paths:
     input: "./data/kitti/input"
@@ -33,38 +33,41 @@ model:
     freeze_epoch: 0
     unfreeze_epoch: 10
   decoder:
-    depth:
-      name: UnetDepthDecoder
-      in_channels: 512
-      channel_scale_factors: [2, 4, 8, 8]
-      out_channels: 1
-      freeze_epoch: None
-      unfreeze_epoch: None
+    name: UnetDepthDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    freeze_epoch: None
+    unfreeze_epoch: None
   necks_and_heads:
     object_detection_2d:
       name: FPNFasterRCNN
-      image_size: [375, 1242] # TODO: set to NEW_H, NEW_W for KITTI
+      image_size: [256, 1184] # TODO: set to NEW_H, NEW_W for KITTI
+      pool_output_size: [7, 7] # shared between RoI and output heads
+      num_classes: 3 # number of classes we are trying to predict
+      num_channels_per_feature_map: [64, 64, 128, 256]
+      out_channels: 256
       rpn:
         - training: True
-        - num_channels_per_feature_map: [64, 256, 512, 512]
         - objectness_threshold: 0.3
         - iou_threshold: 0.7
         - top_k_proposals_training: 2000
         - top_k_proposals_testing: 300
         - anchor_generator:
-          - sizes: [64, 128, 256, 512]
+          - sizes: [[64], [128], [256], [512]]
           - aspect_ratios: [0.5, 1, 2]
         - rpn_head:
           - number_of_object_proposals_per_anchor: 3
-      roi_network:
-        - pool_output_size: [7, 7]
+      roi:
+        - feature_map_names: ["fpn0", "fpn1", "fpn2", "fpn3"]
+        - sampling_ratio: 4
 
 loss:
   depth: 
     - MaskedMAE
-  road_detection:
+  object_detection_2d:
     - BinaryCrossEntropyLoss
-
+  # object_detection_3d:
 optimizer:
   name: Adam
   lr: 1e-4

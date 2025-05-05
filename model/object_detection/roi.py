@@ -1,34 +1,34 @@
 import torch
 from torch import nn
-from torchvision.ops import roi_align
+from torchvision.ops import MultiScaleRoIAlign
 
 
 class ROINetwork(nn.Module):
     def __init__(
-        self, image_size: tuple[int, int], pool_output_size: tuple[int, int] = (7, 7)
+        self,
+        image_size: tuple[int, int],
+        pool_output_size: tuple[int, int] = (7, 7),
+        feature_map_names=["fpn0", "fpn1", "fpn2", "fpn3"],
+        sampling_ratio: int = 4,
     ):
         super().__init__()
         self.image_size = image_size
         self.pool_output_size = pool_output_size
+        self.roi_pool = MultiScaleRoIAlign(
+            featmap_names=feature_map_names,
+            output_size=pool_output_size,
+            sampling_ratio=sampling_ratio,
+        )
 
     def forward(
         self,
         fpn_feature_map_outputs: dict[str, torch.Tensor],
-        proposals_per_feature_map: dict[str, torch.Tensor],
+        proposals: list[torch.Tensor],
     ) -> dict[str, torch.Tensor]:
-        pooled_proposal_feature_map = {}
-        fpn_names = proposals_per_feature_map.keys()
-        for fpn_name in fpn_names:
-            H = fpn_feature_map_outputs[fpn_name].shape[-2]
-            spatial_scale = H / self.image_size[0]
-            pooled_feature_map = roi_align(
-                input=fpn_feature_map_outputs[fpn_name],
-                boxes=proposals_per_feature_map[fpn_name],
-                output_size=self.pool_output_size,
-                spatial_scale=spatial_scale,
-                sampling_ratio=4,
-                aligned=False,
-            )
-            pooled_proposal_feature_map[fpn_name] = pooled_feature_map
+        pooled_proposals = self.roi_pool(
+            x=fpn_feature_map_outputs,
+            boxes=[proposals],
+            image_shapes=[self.image_size],
+        )
 
-        return pooled_proposal_feature_map
+        return pooled_proposals

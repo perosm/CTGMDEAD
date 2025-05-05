@@ -183,18 +183,16 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*blocks)
 
-    def forward(
-        self, x: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        encoder_output = {}
-        encoder_output["e0"] = self.relu(self.bn1(self.conv1(x)))
-        out = self.maxpool(encoder_output["e0"])
-        encoder_output["e1"] = self.layer1(out)
-        encoder_output["e2"] = self.layer2(encoder_output["e1"])
-        encoder_output["e3"] = self.layer3(encoder_output["e2"])
-        encoder_output["e4"] = self.layer4(encoder_output["e3"])
+    def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+        encoder_outputs = {}
+        encoder_outputs["e0"] = self.relu(self.bn1(self.conv1(x)))
+        out = self.maxpool(encoder_outputs["e0"])
+        encoder_outputs["e1"] = self.layer1(out)
+        encoder_outputs["e2"] = self.layer2(encoder_outputs["e1"])
+        encoder_outputs["e3"] = self.layer3(encoder_outputs["e2"])
+        encoder_outputs["e4"] = self.layer4(encoder_outputs["e3"])
 
-        return encoder_output
+        return encoder_outputs
 
 
 def ResNet18(pretrained: bool = True) -> ResNet:

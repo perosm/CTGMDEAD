@@ -63,20 +63,16 @@ class UnetDepthDecoder(nn.Module):
         )
 
     def forward(
-        self,
-        e0: torch.Tensor,
-        e1: torch.Tensor,
-        e2: torch.Tensor,
-        e3: torch.Tensor,
-        e4: torch.Tensor,
-    ) -> torch.Tensor:
-        x = self.layer1(e4, e3)
-        x = self.layer2(x, e2)
-        x = self.layer3(x, e1)
-        x = self.layer4(x, e0)
-        x = self.conv(x)
+        self, encoder_outputs: dict[str, torch.Tensor]
+    ) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
+        fpn_outputs = {}
+        fpn_outputs["fpn3"] = self.layer1(encoder_outputs["e4"], encoder_outputs["e3"])
+        fpn_outputs["fpn2"] = self.layer2(fpn_outputs["fpn3"], encoder_outputs["e2"])
+        fpn_outputs["fpn1"] = self.layer3(fpn_outputs["fpn2"], encoder_outputs["e1"])
+        fpn_outputs["fpn0"] = self.layer4(fpn_outputs["fpn1"], encoder_outputs["e0"])
+        depth = self.conv(fpn_outputs["fpn0"])
 
-        return F.interpolate(x, scale_factor=2, mode="bilinear")
+        return fpn_outputs, F.interpolate(depth, scale_factor=2, mode="bilinear")
 
 
 if __name__ == "__main__":
