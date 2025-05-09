@@ -107,7 +107,8 @@ def road_detection_load_util():
 # see readme from devkit_object
 # name (#values)
 # type (1), truncated (1), occluded (1), alpha (1), bbox (4), dimension (3), location (3), rotation_y (1)
-OBJDET_LABEL_SHAPE = 15
+OBJDET_2D_LABEL_SHAPE = 5
+OBJDET_3D_LABEL_SHAPE = 15
 OBJDET_CLASS_MAPPING = {
     "Car": 0,
     "Van": 1,
@@ -121,6 +122,32 @@ OBJDET_CLASS_MAPPING = {
 }
 
 
+def object_detection_2d_load_util():
+    """
+    Used to return the function that will load the object detection labels accordingly.
+    """
+
+    def func(txt_file_path) -> torch.Tensor:
+        with open(txt_file_path, "r") as file:
+            lines = [line.strip().split(" ") for line in file.readlines()]
+        NUM_DETECTIONS = len(lines)
+        gt = np.empty(shape=(NUM_DETECTIONS, OBJDET_2D_LABEL_SHAPE), dtype=np.float32)
+        for object_index, object_info in enumerate(lines):
+            gt[object_index, 0] = OBJDET_CLASS_MAPPING[object_info[0]]  # class
+            gt[object_index, 1:5] = [
+                float(image_coord)
+                for image_coord in object_info[4:8]  # left, top, right, bottom
+            ]  # 2d bbox image coordinates
+            # gt[object_index, 1] -= KITTI_H - NEW_H  # left
+            # gt[object_index, 2] -= (KITTI_W - NEW_W) / 2  # left
+            # gt[object_index, 3] -= KITTI_H - NEW_H  # bottom
+            # gt[object_index, 4] -= (KITTI_W - NEW_W) / 2  # top
+
+        return torch.from_numpy(gt)
+
+    return func
+
+
 def object_detection_3d_load_util():
     """
     Used to return the function that will load the object detection labels accordingly.
@@ -130,7 +157,7 @@ def object_detection_3d_load_util():
         with open(txt_file_path, "r") as file:
             lines = [line.strip().split(" ") for line in file.readlines()]
         NUM_DETECTIONS = len(lines)
-        gt = np.empty(shape=(NUM_DETECTIONS, OBJDET_LABEL_SHAPE), dtype=np.float32)
+        gt = np.empty(shape=(NUM_DETECTIONS, OBJDET_3D_LABEL_SHAPE), dtype=np.float32)
         for object_index, object_info in enumerate(lines):
             gt[object_index, 0] = OBJDET_CLASS_MAPPING[object_info[0]]  # class
             gt[object_index, 1] = object_info[1]  # truncated flag
@@ -162,7 +189,7 @@ def load_utils(tasks: list[str]) -> dict:
         TaskEnum.input: input_load_util(),
         TaskEnum.depth: depth_load_util(),
         TaskEnum.road_detection: road_detection_load_util(),
-        TaskEnum.object_detection_2d: object_detection_3d_load_util(),  # TODO: make according chanes
+        TaskEnum.object_detection_2d: object_detection_2d_load_util(),
         TaskEnum.object_detection_3d: object_detection_3d_load_util(),
     }
     return {task: task_load_type[task] for task in tasks}

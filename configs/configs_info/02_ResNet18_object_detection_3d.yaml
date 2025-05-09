@@ -4,7 +4,7 @@ dataset:
   dataset_name: KittiDataset
   task_transform:
     input: 
-      - Crop
+      # - Crop
     object_detection_2d:
   task_paths:
     input: "./data/kitti/input"
@@ -44,15 +44,15 @@ model:
       name: FPNFasterRCNN
       image_size: [256, 1184] # TODO: set to NEW_H, NEW_W for KITTI
       pool_output_size: [7, 7] # shared between RoI and output heads
-      num_classes: 3 # number of classes we are trying to predict
       num_channels_per_feature_map: [64, 64, 128, 256]
       out_channels: 256
+      training: True
       rpn:
-        - training: True
         - objectness_threshold: 0.3
         - iou_threshold: 0.7
-        - top_k_proposals_training: 2000
-        - top_k_proposals_testing: 300
+        - pre_nms_filtering: 2000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
+        - top_k_proposals_training: 1000
+        - top_k_proposals_testing: 500
         - anchor_generator:
           - sizes: [[64], [128], [256], [512]]
           - aspect_ratios: [0.5, 1, 2]
@@ -61,12 +61,17 @@ model:
       roi:
         - feature_map_names: ["fpn0", "fpn1", "fpn2", "fpn3"]
         - sampling_ratio: 4
-
+      output_heads:
+        - num_classes: 3 # number of classes we are trying to predict
+        - score_threshold: 0.3
+        - iou_threshold: 0.3
+        - num_detections: 50
+        - top_k_boxes_testing: 10
 loss:
-  depth: 
-    - MaskedMAE
   object_detection_2d:
-    - BinaryCrossEntropyLoss
+    - RPNClassificationLoss # RPN for object classification head
+    - RPNRegressionLoss
+    - RCNNCrossEntropyLoss
   # object_detection_3d:
 optimizer:
   name: Adam

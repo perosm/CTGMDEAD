@@ -52,6 +52,7 @@ class FPNFasterRCNNLinkerBlock(nn.Module):
 class FPNFasterRCNN(nn.Module):
     def __init__(self, configs: dict):
         super().__init__()
+        self.training = configs["training"]
         self.image_size = configs["image_size"]
         self.pool_output_size = configs["pool_output_size"]
         self.num_channels_per_feature_map = configs["num_channels_per_feature_map"]
@@ -62,8 +63,10 @@ class FPNFasterRCNN(nn.Module):
         )
         # TODO: add per feature map RegionProposalNetwork?
         self.rpn = self._configure_region_proposal_network(rpn_config=configs["rpn"])
-        self.roi = self._configure_roi_network(roi_config=configs["roi"])
-        self.output_heads = self._configure_output_heads(config=configs)
+        self.roi = self._configure_region_of_interest_network(roi_config=configs["roi"])
+        self.output_heads = self._configure_output_heads(
+            output_heads_config=configs["output_heads"]
+        )
 
     def _configure_linker_layer(
         self, num_channels_per_feature_map: list[int], out_channels: int
@@ -79,12 +82,15 @@ class FPNFasterRCNN(nn.Module):
         rpn_config.append({"image_size": self.image_size})
         rpn_config.append({"num_fpn_outputs": len(self.num_channels_per_feature_map)})
         rpn_config.append({"num_channels": self.out_channels})
+        rpn_config.append({"training": self.training})
         rpn_config = list_of_dict_to_dict(
             list_of_dicts=rpn_config, new_dict={}, depth_cnt=1
         )
         return RegionProposalNetwork(configs=rpn_config)
 
-    def _configure_roi_network(self, roi_config: list[dict]) -> ROINetwork:
+    def _configure_region_of_interest_network(
+        self, roi_config: list[dict]
+    ) -> ROINetwork:
         roi_config = list_of_dict_to_dict(roi_config, new_dict={}, depth_cnt=1)
         return ROINetwork(
             image_size=self.image_size,
@@ -93,9 +99,19 @@ class FPNFasterRCNN(nn.Module):
             sampling_ratio=roi_config["sampling_ratio"],
         )
 
-    def _configure_output_heads(self, config: dict) -> OutputHeads:
+    def _configure_output_heads(self, output_heads_config: list[dict]) -> OutputHeads:
+        output_heads_config = list_of_dict_to_dict(
+            list_of_dicts=output_heads_config,
+        )
         return OutputHeads(
-            pool_size=config["pool_output_size"], num_classes=config["num_classes"]
+            training=self.training,
+            image_size=self.image_size,
+            pool_size=self.pool_output_size,
+            num_classes=output_heads_config["num_classes"],
+            score_threshold=output_heads_config["score_threshold"],
+            iou_threshold=output_heads_config["iou_threshold"],
+            num_detections=output_heads_config["num_detections"],
+            top_k_boxes_testing=output_heads_config["top_k_boxes_testing"],
         )
 
     def forward(self, fpn_outputs: dict[str, torch.Tensor]) -> torch.Tensor:
@@ -107,6 +123,11 @@ class FPNFasterRCNN(nn.Module):
             proposals=proposals,
         )
 
-        class_logits, bounding_box_offsets = self.output_heads(pooled_proposals)
+        class_probits, bounding_boxes = self.output_heads(pooled_proposals, proposals)
+        if self.training:
+            return {
+                "rpn": (objectness_scores, proposals),
+                "faster-rcnn": (class_probits, bounding_boxes),
+            }
 
-        return class_logits, bounding_box_offsets
+        return class_probits, bounding_boxes

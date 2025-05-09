@@ -105,6 +105,7 @@ class RegionProposalNetwork(nn.Module):
         self.iou_threshold = configs["iou_threshold"]
         self.top_k_proposals_training = configs["top_k_proposals_training"]
         self.top_k_proposals_testing = configs["top_k_proposals_testing"]
+        self.pre_nms_filtering = configs["pre_nms_filtering"]
 
         self.anchor_generator = self._configure_anchor_generator(
             anchor_generator_config=configs["anchor_generator"]
@@ -199,8 +200,9 @@ class RegionProposalNetwork(nn.Module):
         Proposals per feature map are being filtered in the following order:
             - 1) Clip proposals to fit into image
             - 2) Proposals with objectness_score < objectness_threshold
-            - 3) Non-Max Supression (NMS) between proposals for the same ground truth
-            - 4) Pick top K proposals
+            - 3) Filtering before applying Non-Max Supression (NMS)
+            - 4) Non-Max Supression (NMS) between proposals for the same ground truth
+            - 5) Pick top K proposals
 
         Args:
         """
@@ -214,18 +216,19 @@ class RegionProposalNetwork(nn.Module):
         proposals = proposals[keep]
         objectness_score = objectness_score[keep]
 
-        # TODO: REMOVE
-        # only for debugging purposes
-        num = min(proposals.shape[0], 100000)
-        proposals = proposals[:num]
-        objectness_score = objectness_score[:num]
+        # 3) Filter before applying NMS
+        _, indices = torch.topk(
+            objectness_score, k=self.pre_nms_filtering, largest=True
+        )
+        proposals = proposals[indices]
+        objectness_score = objectness_score[indices]
 
-        # 3) filter using NMS
+        # 4) filter using NMS
         keep = nms(
             boxes=proposals, scores=objectness_score, iou_threshold=self.iou_threshold
         )
 
-        # 4) pick top K proposals
+        # 5) pick top K proposals
         top_k = min(
             (
                 self.top_k_proposals_training
@@ -270,36 +273,3 @@ class RegionProposalNetwork(nn.Module):
             all_proposals.append(proposals)
 
         return torch.cat(all_objectness_scores), torch.cat(all_proposals)
-
-
-if __name__ == "__main__":
-    DEVICE = "cuda"
-    num_channels_per_feature_map = [64, 128, 256, 512]
-    anchor_generator = AnchorGenerator(
-        sizes=(  # TODO: which anchor sizes to choose?
-            # (64),  # fpn_1
-            (128),  # fpn_2
-            (256),  # fpn_3
-            (512),  # fpn_4
-        ),
-        aspect_ratios=(
-            # (0.5, 1.0, 2.0),
-            (0.5, 1.0, 2.0),
-            (0.5, 1.0, 2.0),
-            (0.5, 1.0, 2.0),
-        ),
-    ).to(DEVICE)
-    input_image = torch.zeros((1, 3, 256, 1184)).to(DEVICE)
-    feature_maps = {
-        # "fpn1": torch.zeros((1, 64, 128, 592)).to(DEVICE),
-        "fpn2": torch.zeros((1, 128, 64, 296)).to(DEVICE),
-        "fpn3": torch.zeros((1, 256, 32, 148)).to(DEVICE),
-        "fpn4": torch.zeros((1, 512, 16, 74)).to(DEVICE),
-    }
-    rpn = RegionProposalNetwork(
-        num_channels_per_feature_map=num_channels_per_feature_map,
-        anchor_generator=anchor_generator,
-        image_size=input_image.shape[-2:],
-        training=True,
-    ).to(DEVICE)
-    rpn(feature_maps)

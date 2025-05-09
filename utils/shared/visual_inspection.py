@@ -15,7 +15,7 @@ def plot_task_gt(task_ground_truth: dict[str, torch.Tensor]):
     for i, (task, ground_truth) in enumerate(task_ground_truth.items()):
         if task not in list(TaskEnum):  # for projection matrices
             continue
-        if task == TaskEnum.object_detection_3d:
+        if task == TaskEnum.object_detection_2d:
             image = (
                 task_ground_truth[TaskEnum.input]
                 .squeeze(0)
@@ -26,18 +26,38 @@ def plot_task_gt(task_ground_truth: dict[str, torch.Tensor]):
                 .astype(np.uint8)
                 .copy()
             )
-            image_bbox_3d = image.copy()
             ground_truth = ground_truth.squeeze(0).detach().cpu().numpy()
+            for object_info in ground_truth:
+                bounding_box = np.array(
+                    [int(image_coords) for image_coords in object_info[1:]]
+                )
+                draw_bbox(image, bounding_box)
+            ax[i].imshow(image)
+            ax[i].set_title(f"Task: {task}")
+            ax[i].axis("off")
+        elif task == TaskEnum.object_detection_3d:
+            image = (
+                task_ground_truth[TaskEnum.input]
+                .squeeze(0)
+                .permute(1, 2, 0)
+                .detach()
+                .cpu()
+                .numpy()
+                .astype(np.uint8)
+                .copy()
+            )
+            ground_truth = ground_truth.detach().cpu().numpy()
             projection_matrix = (
                 task_ground_truth["projection_matrix"].squeeze(0).detach().cpu().numpy()
             )
-            for object_info in ground_truth:
-                bbox_2d, bbox_3d = _read_object_detection_gt_info(object_info)
-                draw_bbox(image, bbox_2d)
-                bbox_3d_projected = project_3d_bbox_to_image(bbox_3d, projection_matrix)
-                draw_3d_bbox(image_bbox_3d, bbox_3d_projected)
+            for bounding_box_3d in ground_truth:
 
-            ax[i + 1].imshow(image_bbox_3d)
+                bbox_3d_projected = project_3d_bbox_to_image(
+                    bounding_box_3d, projection_matrix
+                )
+                draw_3d_bbox(image, bbox_3d_projected)
+
+            ax[i + 1].imshow(image)
             ax[i + 1].set_title(f"Task: {task}")
             ax[i + 1].axis("off")
         else:
@@ -127,3 +147,26 @@ def draw_3d_bbox(image_3d_bboxes: np.ndarray, projected_points: np.ndarray):
         cv2.line(
             image_3d_bboxes, start_point, end_point, color=(255, 0, 0), thickness=1
         )
+
+
+def plot_object_detection_predictions_2d(
+    input_image: torch.Tensor, predicted_bounding_boxes: torch.Tensor
+):
+    input_image = (
+        input_image.squeeze(0)
+        .permute(1, 2, 0)
+        .detach()
+        .cpu()
+        .numpy()
+        .astype(np.uint8)
+        .copy()
+    )
+    predicted_bounding_boxes = (
+        predicted_bounding_boxes[TaskEnum.object_detection_2d][1].detach().cpu().numpy()
+    )
+
+    for bbox_2d in predicted_bounding_boxes:
+        draw_bbox(input_image, bbox_2d.astype(np.uint8))
+
+    plt.imshow(input_image)
+    plt.show()

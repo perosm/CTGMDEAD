@@ -170,11 +170,6 @@ class KittiDataset(Dataset):
                 self.load_functions[task](self.paths_dict[task][idx])
             )
         if KITTIutils.TaskEnum.object_detection_3d in self.paths_dict.keys():
-            print(
-                self.paths_dict[KITTIutils.TaskEnum.object_detection_3d][idx].parts[
-                    self.UNIQUE_PATH_PARTS_NUMBER :
-                ]
-            )
             frame_id = "/".join(
                 self.paths_dict[KITTIutils.TaskEnum.object_detection_3d][idx].parts[
                     self.UNIQUE_PATH_PARTS_NUMBER :

@@ -2,7 +2,10 @@ import torch
 import logging
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from utils.shared.visual_inspection import plot_task_gt
+from utils.shared.visual_inspection import (
+    plot_task_gt,
+    plot_object_detection_predictions_2d,
+)
 from utils.shared.aggregators.LossAggregator import LossAggregator
 from utils.shared.savers.LossSaver import LossSaver
 
@@ -46,18 +49,18 @@ def train(args: dict):
         freeze_model(model, args["model"], False, epoch)
         # for data in tqdm(train_dataloader, f"Epoch {epoch}"):
         data = {task: data[task].to(device) for task in data.keys()}
-        # plot_task_gt(data)
-
-        pred = model(data["input"])
+        plot_task_gt(data)
+        # pred = model(data["input"])
+        # pred = prediction_postprocessing(pred)
         # loss, per_batch_task_losses = losses(pred, data)
         # loss.backward()
+        # plot_object_detection_predictions_2d(data["input"], pred["object_detection_2d"])
         # optimizer.step()
         # optimizer.zero_grad()
         # loss_aggregator.aggregate_per_batch(per_batch_task_losses)
         # logger.log(logging.INFO, f"epoch: {epoch}; loss: {loss}")
 
     loss_saver.save_plot()
-    plot_task_gt({"input": data["input"], "road_detection": pred["road_detection"]})
     torch.save(model.state_dict(), save_dir / "model.pth")
 
     return

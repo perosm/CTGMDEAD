@@ -1,6 +1,7 @@
 import os
 import re
 import pathlib
+from typing import Any
 
 import torch
 from torch import nn
@@ -25,6 +26,11 @@ from utils.shared.losses import (
     MaskedMAE,
     MultiTaskLoss,
     BinaryCrossEntropyLoss,
+)
+from utils.object_detection.losses import (
+    RPNClassificationLoss,
+    RPNRegressionLoss,
+    RCNNCrossEntropyLoss,
 )
 
 
@@ -185,14 +191,17 @@ def freeze_params(
 ############################## TRAIN UTILS ##############################
 def configure_loss(loss_configs: dict) -> MultiTaskLoss:
     loss_dict = {
-        MaskedMAE.__name__: MaskedMAE(),
-        GradLoss.__name__: GradLoss(),
-        BinaryCrossEntropyLoss.__name__: BinaryCrossEntropyLoss(),
+        MaskedMAE.__name__: MaskedMAE,
+        GradLoss.__name__: GradLoss,
+        BinaryCrossEntropyLoss.__name__: BinaryCrossEntropyLoss,
+        RPNClassificationLoss.__name__: RPNClassificationLoss,
+        RPNRegressionLoss.__name__: RPNRegressionLoss,
+        RCNNCrossEntropyLoss.__name__: RCNNCrossEntropyLoss,
     }
     task_losses = {task: [] for task in loss_configs.keys()}
     for task in loss_configs.keys():
         for loss_name in loss_configs[task]:
-            task_losses[task].append(loss_dict[loss_name])
+            task_losses[task].append(loss_dict[loss_name]())
 
     return MultiTaskLoss(task_losses)
 
@@ -203,6 +212,17 @@ def configure_optimizer(model: nn.Module, optimizer_configs: dict) -> Optimizer:
     return optimizer_dict[optimizer_configs["name"]](
         model.parameters(), float(optimizer_configs["lr"])
     )
+
+
+def prediction_postprocessing(predictions: dict[str, Any]):
+    postprocessed_predictions = {}
+    postprocess_functions = {
+        TaskEnum.depth: True,
+    }
+    for task, values in predictions.items():
+        postprocessed_predictions[task] = postprocess_functions[task](values)
+
+    return postprocessed_predictions
 
 
 ############################## TEST UTILS ##############################

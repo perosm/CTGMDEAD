@@ -154,32 +154,3 @@ class AnchorGenerator(nn.Module):
 
         anchors = torch.cat(anchors_over_all_feature_maps)
         return anchors, num_anchors_per_feature_map
-
-
-if __name__ == "__main__":
-    device = torch.device("cuda")
-    ag = AnchorGenerator(
-        sizes=(  # TODO: which anchor sizes to choose?
-            (512),
-            (256),
-            (128),
-            (64, 32),
-        ),
-        aspect_ratios=(
-            (0.5, 1.0, 2.0),
-            (0.5, 1.0, 2.0),
-            (0.5, 1.0, 2.0),
-            (0.5, 1.0, 2.0),
-        ),
-    )
-    input_image = torch.zeros((2, 3, 256, 1184))
-    feature_maps = [
-        torch.zeros((512, 16, 74)),
-        torch.zeros((256, 32, 148)),
-        torch.zeros((128, 64, 296)),
-        torch.zeros((64, 128, 592)),
-    ]
-    anchors, num_anchors_per_feature_map = ag(
-        input_image, feature_maps
-    )  # Anchors w.r.t original input image
-    breakpoint()
