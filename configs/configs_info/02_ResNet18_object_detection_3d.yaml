@@ -4,7 +4,7 @@ dataset:
   dataset_name: KittiDataset
   task_transform:
     input: 
-      # - Crop
+      - Crop
     object_detection_2d:
   task_paths:
     input: "./data/kitti/input"
@@ -50,8 +50,8 @@ model:
       rpn:
         - objectness_threshold: 0.3
         - iou_threshold: 0.7
-        - pre_nms_filtering: 2000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
-        - top_k_proposals_training: 1000
+        - pre_nms_filtering: 3000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
+        - top_k_proposals_training: 2000 # per fpn layer
         - top_k_proposals_testing: 500
         - anchor_generator:
           - sizes: [[64], [128], [256], [512]]
@@ -64,13 +64,12 @@ model:
       output_heads:
         - num_classes: 3 # number of classes we are trying to predict
         - score_threshold: 0.3
-        - iou_threshold: 0.3
-        - num_detections: 50
-        - top_k_boxes_testing: 10
+        - iou_threshold: 0.5
+        - top_k_boxes_training: 2000
+        - top_k_boxes_testing: 100
 loss:
   object_detection_2d:
-    - RPNClassificationLoss # RPN for object classification head
-    - RPNRegressionLoss
+    - RPNClassificationRegressionLoss
     - RCNNCrossEntropyLoss
   # object_detection_3d:
 optimizer:

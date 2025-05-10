@@ -110,7 +110,7 @@ class FPNFasterRCNN(nn.Module):
             num_classes=output_heads_config["num_classes"],
             score_threshold=output_heads_config["score_threshold"],
             iou_threshold=output_heads_config["iou_threshold"],
-            num_detections=output_heads_config["num_detections"],
+            top_k_boxes_training=output_heads_config["top_k_boxes_training"],
             top_k_boxes_testing=output_heads_config["top_k_boxes_testing"],
         )
 

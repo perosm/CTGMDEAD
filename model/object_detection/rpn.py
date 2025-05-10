@@ -218,7 +218,9 @@ class RegionProposalNetwork(nn.Module):
 
         # 3) Filter before applying NMS
         _, indices = torch.topk(
-            objectness_score, k=self.pre_nms_filtering, largest=True
+            objectness_score,
+            k=min(self.pre_nms_filtering, objectness_score.numel()),
+            largest=True,
         )
         proposals = proposals[indices]
         objectness_score = objectness_score[indices]

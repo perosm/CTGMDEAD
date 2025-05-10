@@ -28,8 +28,7 @@ from utils.shared.losses import (
     BinaryCrossEntropyLoss,
 )
 from utils.object_detection.losses import (
-    RPNClassificationLoss,
-    RPNRegressionLoss,
+    RPNClassificationRegressionLoss,
     RCNNCrossEntropyLoss,
 )
 
@@ -194,8 +193,7 @@ def configure_loss(loss_configs: dict) -> MultiTaskLoss:
         MaskedMAE.__name__: MaskedMAE,
         GradLoss.__name__: GradLoss,
         BinaryCrossEntropyLoss.__name__: BinaryCrossEntropyLoss,
-        RPNClassificationLoss.__name__: RPNClassificationLoss,
-        RPNRegressionLoss.__name__: RPNRegressionLoss,
+        RPNClassificationRegressionLoss.__name__: RPNClassificationRegressionLoss,
         RCNNCrossEntropyLoss.__name__: RCNNCrossEntropyLoss,
     }
     task_losses = {task: [] for task in loss_configs.keys()}

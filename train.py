@@ -49,10 +49,9 @@ def train(args: dict):
         freeze_model(model, args["model"], False, epoch)
         # for data in tqdm(train_dataloader, f"Epoch {epoch}"):
         data = {task: data[task].to(device) for task in data.keys()}
-        plot_task_gt(data)
-        # pred = model(data["input"])
-        # pred = prediction_postprocessing(pred)
-        # loss, per_batch_task_losses = losses(pred, data)
+        # plot_task_gt(data)
+        pred = model(data["input"])
+        loss, per_batch_task_losses = losses(pred, data)
         # loss.backward()
         # plot_object_detection_predictions_2d(data["input"], pred["object_detection_2d"])
         # optimizer.step()

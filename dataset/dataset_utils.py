@@ -137,11 +137,11 @@ def object_detection_2d_load_util():
             gt[object_index, 1:5] = [
                 float(image_coord)
                 for image_coord in object_info[4:8]  # left, top, right, bottom
-            ]  # 2d bbox image coordinates
-            # gt[object_index, 1] -= KITTI_H - NEW_H  # left
-            # gt[object_index, 2] -= (KITTI_W - NEW_W) / 2  # left
-            # gt[object_index, 3] -= KITTI_H - NEW_H  # bottom
-            # gt[object_index, 4] -= (KITTI_W - NEW_W) / 2  # top
+            ]
+            gt[object_index, 1] -= (KITTI_W - NEW_W) / 2  # left
+            gt[object_index, 2] -= KITTI_H - NEW_H  # top
+            gt[object_index, 3] -= (KITTI_W - NEW_W) / 2  # right
+            gt[object_index, 4] -= KITTI_H - NEW_H  # bottom
 
         return torch.from_numpy(gt)
 

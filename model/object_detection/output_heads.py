@@ -15,7 +15,7 @@ class OutputHeads(nn.Module):
         num_classes: int,
         score_threshold: float,
         iou_threshold: float,
-        num_detections: int,
+        top_k_boxes_training: int,
         top_k_boxes_testing: int,
     ) -> None:
         """
@@ -32,7 +32,7 @@ class OutputHeads(nn.Module):
         self.num_classes = num_classes
         self.score_threshold = score_threshold
         self.iou_threshold = iou_threshold
-        self.num_detection = num_detections
+        self.top_k_boxes_training = top_k_boxes_training
         self.top_k_boxes_testing = top_k_boxes_testing
         self.fc1 = nn.Linear(
             in_features=self.rpn_out_channels * pool_size[0] * pool_size[1],
@@ -44,6 +44,19 @@ class OutputHeads(nn.Module):
         self.regression_head = nn.Linear(
             in_features=self.output_features, out_features=4 * num_classes
         )
+
+        self._init_weights()
+
+    def _init_weights(self):
+        """
+        Initialize the weights of the RoI module by drawing weights from a
+        zero-mean Gaussian distribution with standard deviation 0.01.
+        """
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.normal_(module.weight, mean=0, std=0.01)
+                if module.bias is not None:
+                    nn.init.normal_(module.bias, mean=0, std=0.01)
 
     def _fetch_boxes(
         self,
@@ -139,11 +152,11 @@ class OutputHeads(nn.Module):
         bounding_boxes = bounding_boxes[keep]
 
         # 4) pick top K proposals
-        if not self.training:
-            keep = keep[: self.top_k_boxes_testing]
+        top_k = self.top_k_boxes_training if self.training else self.top_k_boxes_testing
 
-            bounding_boxes = bounding_boxes[keep]
-            objectness_score = objectness_score[keep]
+        keep = keep[:top_k]
+        bounding_boxes = bounding_boxes[keep]
+        class_probits = class_probits[keep]
 
         return class_probits, bounding_boxes
 
