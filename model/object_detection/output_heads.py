@@ -136,6 +136,7 @@ class OutputHeads(nn.Module):
         class_probits = torch.softmax(class_logits, dim=-1)
         keep = torch.any(class_probits > self.score_threshold, dim=1)
         bounding_boxes = bounding_boxes[keep]
+        class_logits = class_logits[keep]
         class_probits = class_probits[keep]
 
         # 3) filter using NMS
@@ -148,17 +149,19 @@ class OutputHeads(nn.Module):
             scores=highest_class_probits,
             iou_threshold=self.iou_threshold,
         )
-        class_probits = class_probits[keep]
         bounding_boxes = bounding_boxes[keep]
+        class_logits = class_logits[keep]
+        class_probits = class_probits[keep]
 
         # 4) pick top K proposals
         top_k = self.top_k_boxes_training if self.training else self.top_k_boxes_testing
 
         keep = keep[:top_k]
         bounding_boxes = bounding_boxes[keep]
+        class_logits = class_logits[keep]
         class_probits = class_probits[keep]
 
-        return class_probits, bounding_boxes
+        return class_logits, bounding_boxes
 
     def forward(
         self, pooled_proposals_per_feature_map: torch.Tensor, proposals: torch.Tensor
@@ -176,7 +179,7 @@ class OutputHeads(nn.Module):
             bbox_regression_deltas=bounding_box_deltas,
             class_logits=class_logits,
         )
-        class_probits, bounding_boxes = self._filter_detections(
+        class_logits, bounding_boxes = self._filter_detections(
             bounding_boxes=bounding_boxes, class_logits=class_logits
         )
-        return class_probits, bounding_boxes
+        return class_logits, bounding_boxes

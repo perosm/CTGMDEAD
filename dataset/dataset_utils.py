@@ -110,15 +110,15 @@ def road_detection_load_util():
 OBJDET_2D_LABEL_SHAPE = 5
 OBJDET_3D_LABEL_SHAPE = 15
 OBJDET_CLASS_MAPPING = {
-    "Car": 0,
+    "Car": 1,
     "Van": 1,
-    "Truck": 2,
-    "Pedestrian": 3,
-    "Person_sitting": 4,
-    "Cyclist": 5,
-    "Tram": 6,
-    "Misc": 7,
-    "DontCare": 8,
+    "Truck": 1,
+    "Pedestrian": 2,
+    "Person_sitting": 2,
+    "Cyclist": 2,
+    "Tram": 0,
+    "Misc": 0,
+    "DontCare": 0,
 }
 
 

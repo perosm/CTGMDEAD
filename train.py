@@ -52,13 +52,16 @@ def train(args: dict):
         # plot_task_gt(data)
         pred = model(data["input"])
         loss, per_batch_task_losses = losses(pred, data)
-        # loss.backward()
-        # plot_object_detection_predictions_2d(data["input"], pred["object_detection_2d"])
-        # optimizer.step()
-        # optimizer.zero_grad()
-        # loss_aggregator.aggregate_per_batch(per_batch_task_losses)
-        # logger.log(logging.INFO, f"epoch: {epoch}; loss: {loss}")
-
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        loss_aggregator.aggregate_per_batch(per_batch_task_losses)
+        logger.log(logging.INFO, f"epoch: {epoch}; loss: {loss}")
+        print(f"Epoch: {epoch}, loss: {loss}")
+        if epoch % 200 == 0:
+            plot_object_detection_predictions_2d(
+                data["input"], pred["object_detection_2d"], save_dir / f"{epoch}.png"
+            )
     loss_saver.save_plot()
     torch.save(model.state_dict(), save_dir / "model.pth")
 

@@ -150,7 +150,7 @@ def draw_3d_bbox(image_3d_bboxes: np.ndarray, projected_points: np.ndarray):
 
 
 def plot_object_detection_predictions_2d(
-    input_image: torch.Tensor, predicted_bounding_boxes: torch.Tensor
+    input_image: torch.Tensor, predicted_bounding_boxes: torch.Tensor, save_name
 ):
     input_image = (
         input_image.squeeze(0)
@@ -161,12 +161,13 @@ def plot_object_detection_predictions_2d(
         .astype(np.uint8)
         .copy()
     )
-    predicted_bounding_boxes = (
-        predicted_bounding_boxes[TaskEnum.object_detection_2d][1].detach().cpu().numpy()
-    )
+    pred_class_logits, pred_bboxes = predicted_bounding_boxes["faster-rcnn"]
+    pred_bboxes = pred_bboxes.detach().cpu().numpy()
+    print(pred_bboxes.max())
+    for pred_bbox in pred_bboxes:
+        draw_bbox(input_image, pred_bbox.astype(np.int64))
 
-    for bbox_2d in predicted_bounding_boxes:
-        draw_bbox(input_image, bbox_2d.astype(np.uint8))
-
+    plt.figure(figsize=(16, 6))
+    plt.axis("off")
     plt.imshow(input_image)
-    plt.show()
+    plt.savefig(save_name)
