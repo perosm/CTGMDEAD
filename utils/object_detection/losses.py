@@ -1,18 +1,22 @@
 import torch
 from torch import nn
-from torchvision.ops import box_iou
+from torchvision.ops import box_iou, clip_boxes_to_image
+from utils.object_detection.utils import (
+    apply_deltas_to_boxes,
+    get_deltas_from_bounding_boxes,
+)
 
 
 class RPNClassificationAndRegressionLoss(nn.Module):
 
     def __init__(self, regularization_factor: float = 10.0) -> None:
         super().__init__()
-        self.n_cls = 256
-        self.iou_negative_threshold = 0.1
-        self.iou_positive_threshold = 0.4
+        self.n_cls = 256 * 4  # * 4 for each fpn output
+        self.iou_negative_threshold = 0.3
+        self.iou_positive_threshold = 0.5
         self.regularization_factor = regularization_factor
-        self.classification_loss = nn.BCEWithLogitsLoss(reduction="mean")
-        self.regression_loss = nn.SmoothL1Loss(reduction="mean")
+        self.classification_loss = nn.BCEWithLogitsLoss(reduction="mean").to("cuda")
+        self.regression_loss = nn.SmoothL1Loss(reduction="mean").to("cuda")
         self.register_forward_pre_hook(self._extract_relevant_tensor_info)
 
     @staticmethod
@@ -21,15 +25,16 @@ class RPNClassificationAndRegressionLoss(nn.Module):
         inputs: tuple[dict[str, tuple[torch.Tensor, torch.Tensor]], torch.Tensor],
     ) -> tuple[torch.Tensor, torch.Tensor]:
         pred_info, gt = inputs
-        objectness_score, proposals = pred_info["rpn"]
+        anchors, all_objectness_scores, _, _, pred_deltas = pred_info["rpn"]
         gt_bounding_box = gt[..., 1:]
 
-        return objectness_score, proposals, gt_bounding_box
+        return anchors, all_objectness_scores, pred_deltas, gt_bounding_box
 
     def forward(
         self,
+        anchors: torch.Tensor,
         objectness_score: torch.Tensor,
-        proposals: torch.Tensor,
+        pred_deltas: torch.Tensor,
         gt_bounding_box: torch.Tensor,
     ) -> torch.Tensor:
         """
@@ -47,51 +52,55 @@ class RPNClassificationAndRegressionLoss(nn.Module):
         Returns:
             Binary Cross Entropy Loss between positive and negative boxes.
         """
-        iou_matrix = box_iou(boxes1=gt_bounding_box.squeeze(0), boxes2=proposals)
+        iou_matrix = box_iou(boxes1=gt_bounding_box.squeeze(0), boxes2=anchors)
 
-        # For each gt object first find best predicted anchor (with highest IoU) and all that satisfy the threshold condition
-        num_objects, num_proposals = iou_matrix.shape
-        best_iou_scores, flat_indices = torch.topk(iou_matrix.flatten(), k=num_objects)
-        best_pos_rows = flat_indices // num_proposals
-        best_pos_cols = flat_indices % num_proposals
-
+        # Finding all positive and negative anchors
         pos_rows, pos_cols = torch.where(iou_matrix > self.iou_positive_threshold)
         neg_rows, neg_cols = torch.where(iou_matrix < self.iou_negative_threshold)
 
-        # # If best predicted anchor IoU < iou_negative_threshold we remove it from best_pos_cols
-        # keep = ~(best_iou_scores < self.iou_negative_threshold)
-        # best_pos_cols = best_pos_cols[keep]
-        # best_pos_rows = best_pos_rows[keep]
+        # Force > 1 positive example
+        gt_max_iou, gt_argmax = iou_matrix.max(dim=1)
+        pos_cols = torch.cat([pos_cols, gt_argmax])
+        pos_rows = torch.cat(
+            [pos_rows, torch.arange(len(gt_argmax), device=gt_argmax.device)]
+        )
 
-        pos_cols = torch.cat([best_pos_cols, pos_cols])
-        pos_rows = torch.cat([best_pos_rows, pos_rows])
+        # Removing duplicates
+        unique_pairs = torch.unique(torch.stack([pos_rows, pos_cols]), dim=1)
+        pos_rows, pos_cols = unique_pairs[0], unique_pairs[1]
 
+        # Balanced sampling
         num_pos = min(self.n_cls // 2, pos_cols.numel())
         num_neg = min(self.n_cls - num_pos, neg_cols.numel())
 
-        pos_indices = torch.randperm(n=pos_cols.shape[0])
-        pos_cols = pos_cols[pos_indices][:num_pos]
-        pos_rows = pos_rows[pos_indices]
+        # Random shuffling
+        pos_indices = torch.randperm(pos_cols.shape[0])
+        pos_cols = pos_cols[pos_indices[:num_pos]]
+        pos_rows = pos_rows[pos_indices[:num_pos]]
 
-        neg_indices = torch.randperm(n=neg_cols.shape[0])
-        neg_cols = neg_cols[neg_indices][:num_neg]
-        neg_rows = neg_rows[neg_indices]
+        neg_indices = torch.randperm(neg_cols.shape[0])
+        neg_cols = neg_cols[neg_indices[:num_neg]]
+        neg_rows = neg_rows[neg_indices[:num_neg]]
 
-        pos = objectness_score[pos_cols]
-        neg = objectness_score[neg_cols]
+        pos = objectness_score[:, pos_cols]
+        neg = objectness_score[:, neg_cols]
 
-        pred_classification = torch.cat([pos, neg])
-        gt_classification = torch.cat([torch.ones(num_pos), torch.zeros(num_neg)]).to(
-            pred_classification.device
-        )
+        pred_classification = torch.cat([pos, neg], dim=1)
+        gt_classification = torch.cat(
+            [torch.ones_like(pos), torch.zeros_like(neg)], dim=1
+        ).to(pred_classification.device)
 
         gt_bounding_box = gt_bounding_box[:, pos_rows, :].squeeze(0)
-        pred_bounding_box = proposals[pos_cols, :]
+        pos_anchors = anchors[pos_cols, :]
+        gt_deltas = get_deltas_from_bounding_boxes(
+            gt_bounding_box=gt_bounding_box, pred_bounding_box=pos_anchors
+        )
+        pred_deltas = pred_deltas[:, pos_cols, :]
 
         return self.classification_loss(
             pred_classification, gt_classification
         ) + self.regularization_factor * self.regression_loss(
-            pred_bounding_box, gt_bounding_box
+            pred_deltas, gt_deltas.unsqueeze(0)
         )
 
 

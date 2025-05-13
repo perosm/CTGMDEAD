@@ -163,7 +163,6 @@ def plot_object_detection_predictions_2d(
     )
     pred_class_logits, pred_bboxes = predicted_bounding_boxes["faster-rcnn"]
     pred_bboxes = pred_bboxes.detach().cpu().numpy()
-    print(pred_bboxes.max())
     for pred_bbox in pred_bboxes:
         draw_bbox(input_image, pred_bbox.astype(np.int64))
 

@@ -58,7 +58,7 @@ def train(args: dict):
         loss_aggregator.aggregate_per_batch(per_batch_task_losses)
         logger.log(logging.INFO, f"epoch: {epoch}; loss: {loss}")
         print(f"Epoch: {epoch}, loss: {loss}")
-        if epoch % 200 == 0:
+        if epoch % 50 == 0:
             plot_object_detection_predictions_2d(
                 data["input"], pred["object_detection_2d"], save_dir / f"{epoch}.png"
             )

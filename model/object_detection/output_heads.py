@@ -78,8 +78,8 @@ class OutputHeads(nn.Module):
         x1, y1, x2, y2 = proposals.unbind(dim=-1)  # left, top, right, bottom
         proposal_width = x2 - x1
         proposal_height = y2 - y1
-        proposal_center_x = y1 + proposal_width / 2
-        proposal_center_y = x1 + proposal_height / 2
+        proposal_center_x = x1 + proposal_width / 2
+        proposal_center_y = y1 + proposal_height / 2
 
         labels = torch.argmax(class_logits, dim=-1)
         bbox_regression_deltas = bbox_regression_deltas.view(

@@ -4,6 +4,7 @@ from torchvision.ops import clip_boxes_to_image, nms
 from model.object_detection.anchor_generator import AnchorGenerator
 
 from utils.shared.dict_utils import list_of_dict_to_dict
+from utils.object_detection.utils import apply_deltas_to_boxes
 
 
 class RPNHead(nn.Module):
@@ -211,7 +212,6 @@ class RegionProposalNetwork(nn.Module):
         proposals = clip_boxes_to_image(boxes=proposals, size=self.image_size)
 
         # 2) filter proposals with objectness_score < objectness_threshold
-        # reject negatives -> they don't contain an object
         keep = objectness_score > self.objectness_threshold
         proposals = proposals[keep]
         objectness_score = objectness_score[keep]
@@ -249,12 +249,20 @@ class RegionProposalNetwork(nn.Module):
     def forward(
         self, fpn_feature_map_outputs: dict[str, torch.Tensor]
     ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
-        all_objectness_scores, all_proposals = [], []
-        all_anchors, num_anchors_per_feature_map = self.anchor_generator(
+        (
+            all_anchors,
+            all_objectness_scores,
+            all_bbox_regression_deltas,
+            filtered_objectness_scores,
+            filtered_proposals,
+        ) = ([], [], [], [], [])
+        anchors_generated, num_anchors_per_feature_map = self.anchor_generator(
             self.image_size, list(fpn_feature_map_outputs.values())
         )
         # for each feature map H_fm x W_fm anchors are created
-        anchors_per_feature_map = torch.split(all_anchors, num_anchors_per_feature_map)
+        anchors_per_feature_map = torch.split(
+            anchors_generated, num_anchors_per_feature_map
+        )
         for fpn_feature_map_name, anchors in zip(
             fpn_feature_map_outputs, anchors_per_feature_map
         ):
@@ -264,14 +272,26 @@ class RegionProposalNetwork(nn.Module):
             objectness_score, bbox_regression_deltas = self.rpn_head(
                 intermediary
             )  # TODO: create separate RPN heads for each fpn?
-            proposals = self._fetch_proposals(
-                anchors=anchors, bbox_regression_deltas=bbox_regression_deltas
+            # we don't want to keep track of computational graph when applying transformation
+            # to anchors because we don't want to backprop loss from RPN module ?
+            anchors = clip_boxes_to_image(anchors, self.image_size)
+            proposals = apply_deltas_to_boxes(
+                boxes=anchors, deltas=bbox_regression_deltas.detach()
             )
-            objectness_score, proposals = self._filter_proposals(
+            filtered_objectness_score, proposals = self._filter_proposals(
                 proposals=proposals,
                 objectness_score=objectness_score,
             )
+            all_anchors.append(anchors)
             all_objectness_scores.append(objectness_score)
-            all_proposals.append(proposals)
+            filtered_objectness_scores.append(filtered_objectness_score)
+            filtered_proposals.append(proposals)
+            all_bbox_regression_deltas.append(bbox_regression_deltas)
 
-        return torch.cat(all_objectness_scores), torch.cat(all_proposals)
+        return (
+            torch.cat(all_anchors, dim=0),
+            torch.cat(all_objectness_scores, dim=1),
+            torch.cat(filtered_objectness_scores),
+            torch.cat(filtered_proposals),
+            torch.cat(all_bbox_regression_deltas, dim=1),
+        )

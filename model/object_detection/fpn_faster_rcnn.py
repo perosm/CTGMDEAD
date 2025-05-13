@@ -116,18 +116,32 @@ class FPNFasterRCNN(nn.Module):
 
     def forward(self, fpn_outputs: dict[str, torch.Tensor]) -> torch.Tensor:
         fpn_outputs = self.linker_layer(fpn_outputs=fpn_outputs)
-        objectness_scores, proposals = self.rpn(fpn_feature_map_outputs=fpn_outputs)
+        (
+            anchors,
+            all_objectness_scores,
+            filtered_objectness_scores,
+            proposals,
+            deltas,
+        ) = self.rpn(fpn_feature_map_outputs=fpn_outputs)
 
         pooled_proposals = self.roi(
             fpn_feature_map_outputs=fpn_outputs,
             proposals=proposals,
         )
 
-        class_probits, bounding_boxes = self.output_heads(pooled_proposals, proposals)
+        class_logits, bounding_boxes = self.output_heads(
+            pooled_proposals_per_feature_map=pooled_proposals, proposals=proposals
+        )
         if self.training:
             return {
-                "rpn": (objectness_scores, proposals),
-                "faster-rcnn": (class_probits, bounding_boxes),
+                "rpn": (
+                    anchors,
+                    all_objectness_scores,
+                    filtered_objectness_scores,
+                    proposals,
+                    deltas,
+                ),
+                "faster-rcnn": (class_logits, bounding_boxes),
             }
 
-        return class_probits, bounding_boxes
+        return class_logits, bounding_boxes
