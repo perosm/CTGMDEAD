@@ -100,7 +100,6 @@ class RegionProposalNetwork(nn.Module):
         Region Proposal Network (RPN) is used to predict whether an object exists
         """
         super().__init__()
-        self.training = configs["training"]
         self.image_size = configs["image_size"]
         self.objectness_threshold = configs["objectness_threshold"]
         self.iou_threshold = configs["iou_threshold"]
@@ -291,7 +290,7 @@ class RegionProposalNetwork(nn.Module):
         return (
             torch.cat(all_anchors, dim=0),
             torch.cat(all_objectness_scores, dim=1),
+            torch.cat(all_bbox_regression_deltas, dim=1),
             torch.cat(filtered_objectness_scores),
             torch.cat(filtered_proposals),
-            torch.cat(all_bbox_regression_deltas, dim=1),
         )

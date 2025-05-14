@@ -16,8 +16,8 @@ class ROINetwork(nn.Module):
         self.pool_output_size = pool_output_size
         self.roi_pool = MultiScaleRoIAlign(
             featmap_names=feature_map_names,
-            output_size=pool_output_size,
-            sampling_ratio=sampling_ratio,
+            output_size=7,
+            sampling_ratio=2,
         )
 
     def forward(
@@ -25,6 +25,7 @@ class ROINetwork(nn.Module):
         fpn_feature_map_outputs: dict[str, torch.Tensor],
         proposals: list[torch.Tensor],
     ) -> dict[str, torch.Tensor]:
+        fpn_feature_map_outputs = dict(sorted(fpn_feature_map_outputs.items()))
         pooled_proposals = self.roi_pool(
             x=fpn_feature_map_outputs,
             boxes=[proposals],

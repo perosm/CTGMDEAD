@@ -2,6 +2,7 @@ import os
 import re
 import pathlib
 from typing import Any
+import logging
 
 import torch
 from torch import nn
@@ -30,6 +31,17 @@ from utils.shared.losses import (
 from utils.object_detection.losses import (
     RPNClassificationAndRegressionLoss,
     RCNNCrossEntropyAndRegressionLoss,
+)
+
+from utils.shared.prediction_postprocessor import PredictionPostprocessor
+from utils.object_detection.prediction_postprocessor import (
+    PredictionPostprocessor as ObjectDetection2DPredictionPostprocessor,
+)
+from utils.depth.prediction_postprocessor import (
+    PredictionPostprocessor as DepthPredictionPostProcessor,
+)
+from utils.road_detection.prediction_postprocessor import (
+    PredictionPostprocessor as RoadPredictionPostprocessor,
 )
 
 
@@ -73,6 +85,22 @@ def configure_savers(
         savers.append(savers_dict[saver_name(aggregators[aggregator_name])])
 
     return savers
+
+
+def configure_logger(save_dir: pathlib.Path, module_name: str) -> logging.Logger:
+    # https://docs.python.org/3/howto/logging-cookbook.html
+    logger = logging.getLogger(module_name)
+    logger.setLevel(logging.INFO)
+
+    file_handler = logging.FileHandler(save_dir / f"{module_name}.log")
+    file_handler.setLevel(logging.INFO)
+    logger.addHandler(file_handler)
+
+    terminal_handler = logging.StreamHandler()
+    terminal_handler.setLevel(logging.INFO)
+    logger.addHandler(terminal_handler)
+
+    return logger
 
 
 ############################## MODEL UTILS ##############################
@@ -212,15 +240,19 @@ def configure_optimizer(model: nn.Module, optimizer_configs: dict) -> Optimizer:
     )
 
 
-def prediction_postprocessing(predictions: dict[str, Any]):
-    postprocessed_predictions = {}
+def configure_prediction_postprocessor(tasks: list[str]):
+    per_task_postprocessing_funcs = {}
     postprocess_functions = {
-        TaskEnum.depth: True,
+        TaskEnum.depth: DepthPredictionPostProcessor,
+        TaskEnum.road_detection: RoadPredictionPostprocessor,
+        TaskEnum.object_detection_2d: ObjectDetection2DPredictionPostprocessor,
     }
-    for task, values in predictions.items():
-        postprocessed_predictions[task] = postprocess_functions[task](values)
+    for task in tasks:
+        per_task_postprocessing_funcs[task] = postprocess_functions[task]()
 
-    return postprocessed_predictions
+    return PredictionPostprocessor(
+        per_task_postprocessing_funcs=per_task_postprocessing_funcs
+    )
 
 
 ############################## TEST UTILS ##############################

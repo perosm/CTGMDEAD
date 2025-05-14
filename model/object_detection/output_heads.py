@@ -9,7 +9,6 @@ class OutputHeads(nn.Module):
 
     def __init__(
         self,
-        training: bool,
         image_size: tuple[int, int],
         pool_size: list[int, int],
         num_classes: int,
@@ -26,7 +25,6 @@ class OutputHeads(nn.Module):
             num_classes: Number of classes we are trying to predict + 1 for background.
         """
         super().__init__()
-        self.training = training
         self.image_size = image_size
         self.pool_size = pool_size
         self.num_classes = num_classes
@@ -111,6 +109,7 @@ class OutputHeads(nn.Module):
         self,
         bounding_boxes: torch.Tensor,
         class_logits: torch.Tensor,
+        deltas: torch.Tensor,
     ):
         """
         Detections are being filtered in the following order:
@@ -138,6 +137,7 @@ class OutputHeads(nn.Module):
         bounding_boxes = bounding_boxes[keep]
         class_logits = class_logits[keep]
         class_probits = class_probits[keep]
+        deltas = deltas[keep]
 
         # 3) filter using NMS
         indices = torch.argmax(class_probits, dim=1)
@@ -152,16 +152,17 @@ class OutputHeads(nn.Module):
         bounding_boxes = bounding_boxes[keep]
         class_logits = class_logits[keep]
         class_probits = class_probits[keep]
+        deltas = deltas[keep]
 
         # 4) pick top K proposals
         top_k = self.top_k_boxes_training if self.training else self.top_k_boxes_testing
 
-        keep = keep[:top_k]
-        bounding_boxes = bounding_boxes[keep]
-        class_logits = class_logits[keep]
-        class_probits = class_probits[keep]
+        bounding_boxes = bounding_boxes[:top_k]
+        class_logits = class_logits[:top_k]
+        class_probits = class_probits[:top_k]
+        deltas = deltas[:top_k]
 
-        return class_logits, bounding_boxes
+        return class_logits, bounding_boxes, deltas
 
     def forward(
         self, pooled_proposals_per_feature_map: torch.Tensor, proposals: torch.Tensor
@@ -174,12 +175,14 @@ class OutputHeads(nn.Module):
         class_logits = self.classification_head(intermediary)
         bounding_box_deltas = self.regression_head(intermediary)
 
-        bounding_boxes = self._fetch_boxes(
-            proposals=proposals,
-            bbox_regression_deltas=bounding_box_deltas,
+        # bounding_boxes = self._fetch_boxes(
+        #     proposals=proposals,
+        #     bbox_regression_deltas=bounding_box_deltas,
+        #     class_logits=class_logits,
+        # )
+        class_logits, proposals, deltas = self._filter_detections(
+            bounding_boxes=proposals,
             class_logits=class_logits,
+            deltas=bounding_box_deltas,
         )
-        class_logits, bounding_boxes = self._filter_detections(
-            bounding_boxes=bounding_boxes, class_logits=class_logits
-        )
-        return class_logits, bounding_boxes
+        return class_logits, proposals, deltas

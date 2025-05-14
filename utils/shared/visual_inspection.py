@@ -2,8 +2,10 @@ import numpy as np
 import cv2
 import torch
 import matplotlib.pyplot as plt
+from torchvision.utils import draw_bounding_boxes
 import dataset.dataset_utils as KITTIUtils
 from dataset.dataset_utils import TaskEnum
+from utils.object_detection.utils import apply_deltas_to_boxes
 
 
 def plot_task_gt(task_ground_truth: dict[str, torch.Tensor]):
@@ -150,23 +152,68 @@ def draw_3d_bbox(image_3d_bboxes: np.ndarray, projected_points: np.ndarray):
 
 
 def plot_object_detection_predictions_2d(
-    input_image: torch.Tensor, predicted_bounding_boxes: torch.Tensor, save_name
+    input_image: torch.Tensor,
+    predicted_bounding_boxes: torch.Tensor,
+    ground_truth_boxes: torch.Tensor,
+    save_name,
 ):
-    input_image = (
-        input_image.squeeze(0)
-        .permute(1, 2, 0)
-        .detach()
-        .cpu()
-        .numpy()
-        .astype(np.uint8)
-        .copy()
-    )
-    pred_class_logits, pred_bboxes = predicted_bounding_boxes["faster-rcnn"]
-    pred_bboxes = pred_bboxes.detach().cpu().numpy()
-    for pred_bbox in pred_bboxes:
-        draw_bbox(input_image, pred_bbox.astype(np.int64))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 16))
+    image_rpn = input_image.squeeze(0).detach().cpu().to(torch.uint8).clone()
+    image_faster_rcnn = input_image.squeeze(0).detach().cpu().to(torch.uint8).clone()
+    (
+        anchors,
+        all_objectness_scores,
+        anchor_deltas,
+        filtered_objectness_scores,
+        proposals,
+    ) = predicted_bounding_boxes["rpn"]
+    _, top_k_boxes_rpn_indices = torch.topk(all_objectness_scores, k=10)
+    anchors = anchors[top_k_boxes_rpn_indices, :]
+    anchor_deltas = anchor_deltas[:, top_k_boxes_rpn_indices, :]
+    anchors = apply_deltas_to_boxes(anchors, anchor_deltas)
+    anchors = anchors.detach().cpu()
 
-    plt.figure(figsize=(16, 6))
-    plt.axis("off")
-    plt.imshow(input_image)
+    pred_class_logits, filtered_proposals, proposal_deltas = predicted_bounding_boxes[
+        "faster-rcnn"
+    ]
+    pred_class_indices = pred_class_logits.argmax(dim=1).to(torch.int64)
+    start_indices = pred_class_indices * 4
+    end_indices = (pred_class_indices + 1) * 4
+    pred_per_class_deltas = torch.stack(
+        [
+            proposal_deltas[i, start:end]
+            for i, (start, end) in enumerate(zip(start_indices, end_indices))
+        ]
+    )
+    pred_bounding_box = apply_deltas_to_boxes(
+        boxes=filtered_proposals, deltas=pred_per_class_deltas
+    )
+    pred_bounding_box = pred_bounding_box.detach()
+
+    ground_truth_boxes = ground_truth_boxes.squeeze(0).cpu().to(torch.int64)[:, 1:]
+    red = (255, 0, 0)
+    green = (0, 255, 0)
+    image_rpn = draw_bounding_boxes(
+        image=image_rpn,
+        boxes=anchors.squeeze().to(torch.int64),
+        colors=red,
+    )
+    image_rpn = draw_bounding_boxes(
+        image=image_rpn,
+        boxes=ground_truth_boxes,
+        colors=green,
+    )
+    image_faster_rcnn = draw_bounding_boxes(
+        image=image_faster_rcnn,
+        boxes=pred_bounding_box.squeeze().to(torch.int64),
+        colors=red,
+    )
+    image_faster_rcnn = draw_bounding_boxes(
+        image=image_faster_rcnn,
+        boxes=ground_truth_boxes,
+        colors=green,
+    )
+    ax1.imshow(image_rpn.permute(1, 2, 0).numpy())
+    ax2.imshow(image_faster_rcnn.permute(1, 2, 0).numpy())
+    plt.tight_layout()
     plt.savefig(save_name)

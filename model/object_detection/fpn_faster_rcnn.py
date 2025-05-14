@@ -52,7 +52,6 @@ class FPNFasterRCNNLinkerBlock(nn.Module):
 class FPNFasterRCNN(nn.Module):
     def __init__(self, configs: dict):
         super().__init__()
-        self.training = configs["training"]
         self.image_size = configs["image_size"]
         self.pool_output_size = configs["pool_output_size"]
         self.num_channels_per_feature_map = configs["num_channels_per_feature_map"]
@@ -82,7 +81,6 @@ class FPNFasterRCNN(nn.Module):
         rpn_config.append({"image_size": self.image_size})
         rpn_config.append({"num_fpn_outputs": len(self.num_channels_per_feature_map)})
         rpn_config.append({"num_channels": self.out_channels})
-        rpn_config.append({"training": self.training})
         rpn_config = list_of_dict_to_dict(
             list_of_dicts=rpn_config, new_dict={}, depth_cnt=1
         )
@@ -104,7 +102,6 @@ class FPNFasterRCNN(nn.Module):
             list_of_dicts=output_heads_config,
         )
         return OutputHeads(
-            training=self.training,
             image_size=self.image_size,
             pool_size=self.pool_output_size,
             num_classes=output_heads_config["num_classes"],
@@ -117,11 +114,11 @@ class FPNFasterRCNN(nn.Module):
     def forward(self, fpn_outputs: dict[str, torch.Tensor]) -> torch.Tensor:
         fpn_outputs = self.linker_layer(fpn_outputs=fpn_outputs)
         (
-            anchors,
-            all_objectness_scores,
-            filtered_objectness_scores,
-            proposals,
-            deltas,
+            anchors,  # (num_anchors, 4)
+            all_objectness_scores,  # (N, num_anchors)
+            anchor_deltas,  # (N, num_anchors, 4)
+            filtered_objectness_scores,  # (num_proposals)
+            proposals,  # (num_proposals, 4)
         ) = self.rpn(fpn_feature_map_outputs=fpn_outputs)
 
         pooled_proposals = self.roi(
@@ -129,19 +126,19 @@ class FPNFasterRCNN(nn.Module):
             proposals=proposals,
         )
 
-        class_logits, bounding_boxes = self.output_heads(
+        class_logits, filtered_proposals, proposal_deltas = self.output_heads(
             pooled_proposals_per_feature_map=pooled_proposals, proposals=proposals
         )
         if self.training:
             return {
                 "rpn": (
-                    anchors,
-                    all_objectness_scores,
-                    filtered_objectness_scores,
-                    proposals,
-                    deltas,
+                    anchors,  # (num_anchors, 4)
+                    all_objectness_scores,  # (N, num_anchors)
+                    anchor_deltas,  # (N, num_anchors, 4)
+                    filtered_objectness_scores,  # (num_proposals)
+                    proposals,  # (num_proposals, 4)
                 ),
-                "faster-rcnn": (class_logits, bounding_boxes),
+                "faster-rcnn": (class_logits, filtered_proposals, proposal_deltas),
             }
 
-        return class_logits, bounding_boxes
+        return class_logits, filtered_proposals, proposal_deltas

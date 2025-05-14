@@ -1,6 +1,5 @@
 import torch
 import logging
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 from utils.shared.visual_inspection import (
     plot_task_gt,
@@ -18,12 +17,15 @@ from utils.kitti.utils import (
     freeze_model,
     configure_optimizer,
     configure_loss,
+    configure_logger,
+    configure_prediction_postprocessor,
 )
 
 
 def train(args: dict):
     logger = logging.getLogger(__name__)
     save_dir = prepare_save_directories(args, "train")
+    logger = configure_logger(save_dir=save_dir, module_name=__name__)
     logging.basicConfig(
         filename=save_dir / "train.log", encoding="utf-8", level=logging.INFO
     )
@@ -33,6 +35,7 @@ def train(args: dict):
     train_dataloader = configure_dataloader(args["train"]["dataloader"], dataset)
 
     model = configure_model(args["model"], device).to(device)
+    # prediction_postprocessor = configure_prediction_postprocessor(tasks=args["tasks"])
     losses = configure_loss(args["loss"])
     optimizer = configure_optimizer(model, args["optimizer"])
     epochs = args["epochs"]
@@ -44,23 +47,31 @@ def train(args: dict):
     loss_saver = LossSaver(loss_aggregator=loss_aggregator, save_dir=save_dir)
 
     data = next(iter(train_dataloader))
-    data = {task: data[task].to(device) for task in data.keys()}
     for epoch in range(epochs):
         freeze_model(model, args["model"], False, epoch)
         # for data in tqdm(train_dataloader, f"Epoch {epoch}"):
         data = {task: data[task].to(device) for task in data.keys()}
         # plot_task_gt(data)
         pred = model(data["input"])
+        # pred = prediction_postprocessor(pred)
         loss, per_batch_task_losses = losses(pred, data)
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
         loss_aggregator.aggregate_per_batch(per_batch_task_losses)
-        logger.log(logging.INFO, f"epoch: {epoch}; loss: {loss}")
-        print(f"Epoch: {epoch}, loss: {loss}")
+        logger.log(
+            logging.INFO,
+            f"epoch: {epoch}; loss: {loss}, per_batch_task_losses: {per_batch_task_losses}",
+        )
+
         if epoch % 50 == 0:
+            images_dir = save_dir / "images"
+            images_dir.mkdir(parents=True, exist_ok=True)
             plot_object_detection_predictions_2d(
-                data["input"], pred["object_detection_2d"], save_dir / f"{epoch}.png"
+                data["input"],
+                pred["object_detection_2d"],
+                data["object_detection_2d"],
+                images_dir / f"{epoch}.png",
             )
     loss_saver.save_plot()
     torch.save(model.state_dict(), save_dir / "model.pth")
