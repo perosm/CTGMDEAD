@@ -64,7 +64,7 @@ def train(args: dict):
             f"epoch: {epoch}; loss: {loss}, per_batch_task_losses: {per_batch_task_losses}",
         )
 
-        if epoch % 50 == 0:
+        if epoch % 1 == 0:
             images_dir = save_dir / "images"
             images_dir.mkdir(parents=True, exist_ok=True)
             plot_object_detection_predictions_2d(

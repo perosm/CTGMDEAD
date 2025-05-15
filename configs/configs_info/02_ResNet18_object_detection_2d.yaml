@@ -73,7 +73,7 @@ loss:
   # object_detection_3d:
 optimizer:
   name: Adam
-  lr: 1e-6
+  lr: 1e-4
 
 epochs: 1000
 

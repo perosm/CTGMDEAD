@@ -9,7 +9,7 @@ from utils.object_detection.utils import apply_deltas_to_boxes
 
 class RPNHead(nn.Module):
     in_channels = 256
-    out_channels_detection = 2
+    out_channels_detection = 1
     out_channels_regression = 4
 
     def __init__(self, number_of_object_proposals_per_anchor: int = 3):
@@ -74,7 +74,8 @@ class RPNHead(nn.Module):
             W_fmap,
         )
         objectness_score = objectness_score.permute(0, 2, 3, 4, 1)
-        objectness_score = objectness_score.view(N, -1, self.out_channels_detection)
+        objectness_score = objectness_score.view(N, -1)
+        # , self.out_channels_detection)
         bbox_regression_deltas = bbox_regression_deltas.view(
             N,
             self.out_channels_regression,
@@ -133,11 +134,15 @@ class RegionProposalNetwork(nn.Module):
     ) -> nn.Module:
         return nn.ModuleDict(
             {
-                f"fpn{i}": nn.Conv2d(
-                    in_channels=num_channels,
-                    out_channels=num_channels,
-                    kernel_size=3,
-                    padding=1,
+                f"fpn{i}": nn.Sequential(
+                    nn.Conv2d(
+                        in_channels=num_channels,
+                        out_channels=num_channels,
+                        kernel_size=3,
+                        padding=1,
+                    ),
+                    nn.BatchNorm2d(num_features=num_channels),
+                    nn.ReLU(),
                 )
                 for i in range(num_fpn_outputs)
             }
@@ -186,14 +191,14 @@ class RegionProposalNetwork(nn.Module):
         proposals = clip_boxes_to_image(boxes=proposals, size=self.image_size)
 
         # 2) filter proposals with objectness_score < objectness_threshold
-        keep = objectness_score[:, 1] > self.objectness_threshold
+        keep = objectness_score > self.objectness_threshold
         proposals = proposals[keep]
         objectness_score = objectness_score[keep]
 
         # 3) Filter before applying NMS
         _, indices = torch.topk(
-            objectness_score[:, 1],
-            k=min(self.pre_nms_filtering, objectness_score.shape[1]),
+            objectness_score,
+            k=min(self.pre_nms_filtering, objectness_score.numel()),
             largest=True,
         )
         proposals = proposals[indices]
@@ -202,7 +207,7 @@ class RegionProposalNetwork(nn.Module):
         # 4) filter using NMS
         keep = nms(
             boxes=proposals,
-            scores=objectness_score[:, 1],
+            scores=objectness_score,
             iou_threshold=self.iou_threshold,
         )
 

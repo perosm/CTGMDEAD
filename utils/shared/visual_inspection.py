@@ -167,7 +167,7 @@ def plot_object_detection_predictions_2d(
         filtered_objectness_scores,
         proposals,
     ) = predicted_bounding_boxes["rpn"]
-    _, top_k_boxes_rpn_indices = torch.topk(all_objectness_scores[:, 1], k=10)
+    _, top_k_boxes_rpn_indices = torch.topk(all_objectness_scores, k=7)
     anchors = anchors[top_k_boxes_rpn_indices]
     anchor_deltas = anchor_deltas[top_k_boxes_rpn_indices]
     anchors = apply_deltas_to_boxes(anchors, anchor_deltas)

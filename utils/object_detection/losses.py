@@ -5,16 +5,19 @@ from utils.object_detection.utils import (
     apply_deltas_to_boxes,
     get_deltas_from_bounding_boxes,
 )
+from torchvision.ops import sigmoid_focal_loss
 
 
 class RPNClassificationAndRegressionLoss(nn.Module):
 
     def __init__(self, regularization_factor: float = 10.0) -> None:
         super().__init__()
-        self.n_cls = 256  # * 4 for each fpn output ?
+        self.n_cls = 256
+        self.positives_ratio = 0.25
+        self.negatives_ratio = 1 - self.positives_ratio
         self.iou_negative_threshold = 0.3
         self.iou_positive_threshold = 0.7
-        self.regularization_factor = 1 / 10.0
+        self.regularization_factor = 10.0
         self.classification_loss_fn = nn.BCELoss(reduction="mean").to("cuda")
         self.regression_loss_fn = nn.SmoothL1Loss(reduction="mean").to("cuda")
         self.register_forward_pre_hook(self._extract_relevant_tensor_info)
@@ -54,7 +57,7 @@ class RPNClassificationAndRegressionLoss(nn.Module):
 
         Args:
             anchors: Predicted bounding boxes by the RPN of shape (num_anchors, 4).
-            objectness_probits: Objectness score for bounding boxes (num_anchors, 2).
+            objectness_probits: Objectness score for bounding boxes (num_anchors).
             pred_deltas: Predicted anchor offsets (num_anchors, 4).
             gt_bounding_box: Ground truth object bounding boxes (num_objects_in_frame, 4).
 
@@ -88,8 +91,10 @@ class RPNClassificationAndRegressionLoss(nn.Module):
         pos_gt_indices = gt_indices[pos_anchor_indices]
 
         # Balanced sampling
-        num_pos = min(self.n_cls // 2, pos_anchor_indices.numel())
-        num_neg = min(self.n_cls - num_pos, neg_anchor_indices.numel())
+        num_pos = self.positives_ratio * self.n_cls
+        num_pos = min(num_pos, pos_anchor_indices.numel())
+        num_neg = int(num_pos / self.positives_ratio * self.negatives_ratio)
+        num_neg = min(num_neg, neg_anchor_indices.numel())
 
         # Random shuffling
         shuffled_pos = torch.randperm(pos_anchor_indices.shape[0])
@@ -99,8 +104,8 @@ class RPNClassificationAndRegressionLoss(nn.Module):
         neg_sample = neg_anchor_indices[shuffled_neg[:num_neg]]
 
         # Classification
-        pred_pos = all_objectness_probits[pos_sample, 1]
-        pred_neg = all_objectness_probits[neg_sample, 0]
+        pred_pos = all_objectness_probits[pos_sample]
+        pred_neg = all_objectness_probits[neg_sample]
         pred_classification = torch.cat([pred_pos, pred_neg])
         gt_classification = torch.cat(
             [torch.ones_like(pred_pos), torch.zeros_like(pred_neg)], dim=0
@@ -108,7 +113,12 @@ class RPNClassificationAndRegressionLoss(nn.Module):
         classification_loss = self.classification_loss_fn(
             pred_classification, gt_classification
         )
-
+        # classification_loss = sigmoid_focal_loss(
+        #     inputs=pred_classification,
+        #     targets=gt_classification,
+        #     alpha=1 - (num_pos / num_neg),
+        #     reduction="mean",
+        # )
         # Regression
         gt_indices_sample = pos_gt_indices[shuffled_pos[:num_pos]]
         pos_gt = gt_bounding_box[gt_indices_sample]
@@ -118,7 +128,9 @@ class RPNClassificationAndRegressionLoss(nn.Module):
             predicted_boxes=pos_anchors,  # TODO: other way around?
         )
         pred_deltas_sampled = all_pred_deltas[pos_sample, :]
-        regression_loss = self.regression_loss_fn(pred_deltas_sampled, gt_deltas)
+        regression_loss = self.regularization_factor * self.regression_loss_fn(
+            pred_deltas_sampled, gt_deltas
+        )
 
         print(
             "RPN classification loss:",
@@ -126,7 +138,7 @@ class RPNClassificationAndRegressionLoss(nn.Module):
             "regression loss:",
             regression_loss.detach(),
         )
-        return classification_loss + self.regularization_factor * regression_loss
+        return classification_loss + regression_loss
 
 
 class RCNNCrossEntropyAndRegressionLoss(nn.Module):
@@ -136,6 +148,7 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         self.pos_iou_threshold = 0.5
         self.n_cls = 256
         self.num_classes = 3
+        self.regularization_factor = 10.0
         self.classification_loss_fn = nn.CrossEntropyLoss(reduction="mean")
         self.regression_loss_fn = nn.SmoothL1Loss(reduction="mean")
         self.register_forward_pre_hook(self._extract_relevant_tensor_info)
@@ -225,6 +238,6 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         classification_loss = self.classification_loss_fn(
             pred_class_logits, gt_classes_per_pred.to(torch.int64)
         )
-        regression_loss = self.regression_loss_fn(pred_per_class_deltas, gt_deltas)
+        regression_loss = self.self.regression_loss_fn(pred_per_class_deltas, gt_deltas)
         print("RCNN", classification_loss, regression_loss)
         return classification_loss + regression_loss
