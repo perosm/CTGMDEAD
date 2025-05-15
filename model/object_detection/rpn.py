@@ -9,7 +9,7 @@ from utils.object_detection.utils import apply_deltas_to_boxes
 
 class RPNHead(nn.Module):
     in_channels = 256
-    out_channels_detection = 1
+    out_channels_detection = 2
     out_channels_regression = 4
 
     def __init__(self, number_of_object_proposals_per_anchor: int = 3):
@@ -48,7 +48,7 @@ class RPNHead(nn.Module):
             if isinstance(module, nn.Conv2d):
                 nn.init.normal_(module.weight, mean=0, std=0.01)
                 if module.bias is not None:
-                    nn.init.normal_(module.bias, mean=0, std=0.01)
+                    nn.init.constant_(module.bias, 0)
 
     def _format_objectness_and_bbox_regression_deltas(
         self, objectness_score: torch.Tensor, bbox_regression_deltas: torch.Tensor
@@ -67,13 +67,25 @@ class RPNHead(nn.Module):
         N, _, H_fmap, W_fmap = objectness_score.shape
 
         objectness_score = objectness_score.view(
-            N, self.number_of_object_proposals_per_anchor * H_fmap * W_fmap
+            N,
+            self.out_channels_detection,
+            self.number_of_object_proposals_per_anchor,
+            H_fmap,
+            W_fmap,
         )
+        objectness_score = objectness_score.permute(0, 2, 3, 4, 1)
+        objectness_score = objectness_score.view(N, -1, self.out_channels_detection)
         bbox_regression_deltas = bbox_regression_deltas.view(
-            N, -1, self.number_of_object_proposals_per_anchor, H_fmap, W_fmap
+            N,
+            self.out_channels_regression,
+            self.number_of_object_proposals_per_anchor,
+            H_fmap,
+            W_fmap,
         )
         bbox_regression_deltas = bbox_regression_deltas.permute(0, 2, 3, 4, 1)
-        bbox_regression_deltas = bbox_regression_deltas.view(N, -1, 4)
+        bbox_regression_deltas = bbox_regression_deltas.view(
+            N, -1, self.out_channels_regression
+        )
 
         return objectness_score, bbox_regression_deltas
 
@@ -153,50 +165,14 @@ class RegionProposalNetwork(nn.Module):
             number_of_object_proposals_per_anchor=number_of_object_proposals_per_anchor
         )
 
-    def _fetch_proposals(
-        self, anchors: torch.Tensor, bbox_regression_deltas: torch.Tensor
-    ) -> torch.Tensor:
-        """
-        Fetches proposals given anchors and bbox_regression_deltas for each of the anchors.
-
-        Args:
-            - anchors:
-            - bbox_regression_deltas:
-
-        Returns:
-            - proposals:
-        """
-        # corners of the anchors
-        x1, y1, x2, y2 = anchors.unbind(dim=-1)  # left, top, right, bottom
-        anchor_width = x2 - x1
-        anchor_height = y2 - y1
-        anchor_center_x = y1 + anchor_width / 2
-        anchor_center_y = x1 + anchor_height / 2
-
-        deltas_x, deltas_y, deltas_w, deltas_h = bbox_regression_deltas.unbind(dim=-1)
-
-        # center coordinates and height, width of predicted bounding box
-        pred_x = anchor_center_x + deltas_x * anchor_width
-        pred_y = anchor_center_y + deltas_y * anchor_height
-        pred_width = anchor_width * torch.exp(deltas_w)
-        pred_height = anchor_height * torch.exp(deltas_h)
-
-        # switching back to corners of predicted bounding box
-        pred_x1 = pred_x - pred_width / 2
-        pred_y1 = pred_y - pred_height / 2
-        pred_x2 = pred_x + pred_width / 2
-        pred_y2 = pred_y + pred_height / 2
-
-        proposals = torch.stack([pred_x1, pred_y1, pred_x2, pred_y2], dim=-1)
-
-        return proposals
-
     def _filter_proposals(
         self,
-        proposals: torch.Tensor,
-        objectness_score: torch.Tensor,
+        proposals: torch.Tensor,  # (num_anchors, 4)
+        objectness_score: torch.Tensor,  # (num_anchors, 2)
     ):
         """
+        Works only for batchsize=1.
+
         Proposals per feature map are being filtered in the following order:
             - 1) Clip proposals to fit into image
             - 2) Proposals with objectness_score < objectness_threshold
@@ -206,19 +182,18 @@ class RegionProposalNetwork(nn.Module):
 
         Args:
         """
-        # TODO: Make it work for N > 1
         # 1) clip proposals
         proposals = clip_boxes_to_image(boxes=proposals, size=self.image_size)
 
         # 2) filter proposals with objectness_score < objectness_threshold
-        keep = objectness_score > self.objectness_threshold
+        keep = objectness_score[:, 1] > self.objectness_threshold
         proposals = proposals[keep]
         objectness_score = objectness_score[keep]
 
         # 3) Filter before applying NMS
         _, indices = torch.topk(
-            objectness_score,
-            k=min(self.pre_nms_filtering, objectness_score.numel()),
+            objectness_score[:, 1],
+            k=min(self.pre_nms_filtering, objectness_score.shape[1]),
             largest=True,
         )
         proposals = proposals[indices]
@@ -226,7 +201,9 @@ class RegionProposalNetwork(nn.Module):
 
         # 4) filter using NMS
         keep = nms(
-            boxes=proposals, scores=objectness_score, iou_threshold=self.iou_threshold
+            boxes=proposals,
+            scores=objectness_score[:, 1],
+            iou_threshold=self.iou_threshold,
         )
 
         # 5) pick top K proposals
@@ -273,10 +250,13 @@ class RegionProposalNetwork(nn.Module):
             )  # TODO: create separate RPN heads for each fpn?
             # we don't want to keep track of computational graph when applying transformation
             # to anchors because we don't want to backprop loss from RPN module ?
+            objectness_score = objectness_score.squeeze(0)
+            bbox_regression_deltas = bbox_regression_deltas.squeeze(0)
             anchors = clip_boxes_to_image(anchors, self.image_size)
             proposals = apply_deltas_to_boxes(
-                boxes=anchors, deltas=bbox_regression_deltas.detach()
+                boxes=anchors, deltas=bbox_regression_deltas
             )
+            proposals = clip_boxes_to_image(proposals, self.image_size)
             filtered_objectness_score, proposals = self._filter_proposals(
                 proposals=proposals,
                 objectness_score=objectness_score,
@@ -289,8 +269,8 @@ class RegionProposalNetwork(nn.Module):
 
         return (
             torch.cat(all_anchors, dim=0),
-            torch.cat(all_objectness_scores, dim=1),
-            torch.cat(all_bbox_regression_deltas, dim=1),
-            torch.cat(filtered_objectness_scores),
-            torch.cat(filtered_proposals),
+            torch.cat(all_objectness_scores, dim=0),
+            torch.cat(all_bbox_regression_deltas, dim=0),
+            torch.cat(filtered_objectness_scores, dim=0),
+            torch.cat(filtered_proposals, dim=0),
         )

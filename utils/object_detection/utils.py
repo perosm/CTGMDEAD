@@ -44,24 +44,30 @@ def apply_deltas_to_boxes(boxes: torch.Tensor, deltas: torch.Tensor) -> torch.Te
 
 
 def get_deltas_from_bounding_boxes(
-    gt_bounding_box: torch.Tensor, pred_bounding_box: torch.Tensor
+    reference_boxes: torch.Tensor, predicted_boxes: torch.Tensor
 ) -> torch.Tensor:
-    x1, y1, x2, y2 = gt_bounding_box.unbind(dim=-1)
-    gt_width = x2 - x1
-    gt_height = y2 - y1
-    gt_center_x = x1 + gt_width
-    gt_center_y = y1 + gt_height
+    x1, y1, x2, y2 = reference_boxes.unbind(dim=-1)
+    reference_boxes_width = x2 - x1
+    reference_boxes_height = y2 - y1
+    reference_boxes_center_x = x1 + reference_boxes_width / 2
+    reference_boxes_center_y = y1 + reference_boxes_height / 2
 
-    pred_x1, pred_y1, pred_x2, pred_y2 = pred_bounding_box.unbind(dim=-1)
-    pred_width = pred_x2 - pred_x1
-    pred_height = pred_y2 - pred_y1
-    pred_center_x = pred_x1 + pred_width
-    pred_center_y = pred_y1 + pred_height
+    predicted_boxes_x1, predicted_boxes_y1, predicted_boxes_x2, predicted_boxes_y2 = (
+        predicted_boxes.unbind(dim=-1)
+    )
+    predicted_boxes_width = predicted_boxes_x2 - predicted_boxes_x1
+    predicted_boxes_height = predicted_boxes_y2 - predicted_boxes_y1
+    predicted_boxes_center_x = predicted_boxes_x1 + predicted_boxes_width / 2
+    predicted_boxes_center_y = predicted_boxes_y1 + predicted_boxes_height / 2
 
-    deltas_x = (gt_center_x - pred_center_x) / pred_width
-    deltas_y = (gt_center_y - pred_center_y) / pred_height
-    deltas_w = torch.log(gt_width / pred_width)
-    deltas_h = torch.log(gt_height / pred_height)
+    deltas_x = (
+        reference_boxes_center_x - predicted_boxes_center_x
+    ) / predicted_boxes_width
+    deltas_y = (
+        reference_boxes_center_y - predicted_boxes_center_y
+    ) / predicted_boxes_height
+    deltas_w = torch.log(reference_boxes_width / predicted_boxes_width)
+    deltas_h = torch.log(reference_boxes_height / predicted_boxes_height)
 
     deltas = torch.stack([deltas_x, deltas_y, deltas_w, deltas_h], dim=1)
 
