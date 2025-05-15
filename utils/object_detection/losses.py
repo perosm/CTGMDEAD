@@ -67,7 +67,7 @@ class RPNClassificationAndRegressionLoss(nn.Module):
         # Computing IoU between gt and all anchors
         iou_matrix = box_iou(boxes1=gt_bounding_box, boxes2=all_anchors)
 
-        # For each anchor fing gt with highest Iou
+        # For each anchor fing gt with highest IoU
         max_iou_per_anchor, gt_indices = iou_matrix.max(dim=0)
 
         # For each gt find anchor with highest IoU
@@ -132,20 +132,16 @@ class RPNClassificationAndRegressionLoss(nn.Module):
             pred_deltas_sampled, gt_deltas
         )
 
-        print(
-            "RPN classification loss:",
-            classification_loss.detach(),
-            "regression loss:",
-            regression_loss.detach(),
-        )
         return classification_loss + regression_loss
 
 
 class RCNNCrossEntropyAndRegressionLoss(nn.Module):
     def __init__(self):
         super().__init__()
-        self.neg_iou_threshold = 0.3
-        self.pos_iou_threshold = 0.5
+        self.positives_ratio = 0.25
+        self.negatives_ratio = 1 - self.positives_ratio
+        self.iou_positive_threshold = 0.5
+        self.iou_negative_threshold = 0.2
         self.n_cls = 256
         self.num_classes = 3
         self.regularization_factor = 10.0
@@ -172,72 +168,58 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         gt_class: torch.Tensor,
         gt_bounding_boxes: torch.Tensor,
     ) -> torch.Tensor:
+        """ """
+        # Computing IoU between gt and all anchors
         iou_matrix = box_iou(boxes1=gt_bounding_boxes, boxes2=proposals)
 
-        # force atleast one predictions per ground truth
-        max_ious, best_prop_per_gt_indices = iou_matrix.max(dim=1)
-        forced_gt_indices = torch.arange(
-            best_prop_per_gt_indices.shape[0], device=best_prop_per_gt_indices.device
-        )
+        # For each anchor fing gt with highest IoU
+        max_iou_per_proposal, gt_indices = iou_matrix.max(dim=0)
 
-        # object_rows represents the gt object corresponding to the predicted object
-        # which is represented by the object_cols in the iou_matrix if IoU > threshold
-        pos_gt_indices, pos_prop_indices = torch.where(
-            iou_matrix > self.pos_iou_threshold
-        )
+        # For each gt find anchor with highest IoU
+        gt_best_proposal_indices = iou_matrix.argmax(dim=1)
 
-        # combining both forced and condition satisfying indices
-        pos_gt_indices = torch.cat([forced_gt_indices, pos_gt_indices], dim=0)
-        pos_prop_indices = torch.cat(
-            [best_prop_per_gt_indices, pos_prop_indices], dim=0
-        )
+        # For positive proposals we take all anchors whose
+        # IoU > iou_positive_threshold
+        # and we force always at least one anchor per gt
+        positive_mask = max_iou_per_proposal > self.iou_positive_threshold
+        positive_mask[gt_best_proposal_indices] = True
 
-        # TODO: limit number of predictions per gt ?
+        # For negative anchors we take all anchors whose
+        # IoU value < iou_negative_threshold
+        negative_mask = (
+            max_iou_per_proposal < self.iou_negative_threshold
+        ) & ~positive_mask
 
-        # negative indices
-        neg_gt_indices, neg_prop_indices = torch.where(
-            iou_matrix < self.neg_iou_threshold
-        )
+        pos_proposal_indices = torch.where(positive_mask)[0]
+        neg_proposal_indices = torch.where(negative_mask)[0]
 
-        # balanced sampling
-        num_pos = min(self.n_cls // 2, pos_prop_indices.numel())
-        num_neg = self.n_cls - num_pos
+        pos_gt_indices = gt_indices[pos_proposal_indices]
+        neg_gt_indices = gt_indices[neg_proposal_indices]
 
-        pos_permute = torch.randperm(pos_prop_indices.numel())
-        neg_permute = torch.randperm(neg_prop_indices.numel())
-        pos_prop_indices = pos_prop_indices[pos_permute][:num_pos]
-        neg_prop_indices = neg_prop_indices[neg_permute][:num_neg]
-        pos_gt_indices = pos_gt_indices[pos_permute][:num_pos]
-        neg_gt_indices = neg_gt_indices[neg_permute][:num_neg]
+        # Balanced sampling
+        num_pos = self.positives_ratio * self.n_cls
+        num_pos = min(num_pos, pos_proposal_indices.numel())
+        num_neg = int(num_pos / self.positives_ratio * self.negatives_ratio)
+        num_neg = min(num_neg, neg_proposal_indices.numel())
 
-        gt_indices = torch.cat([pos_gt_indices, neg_gt_indices], dim=0)
-        pred_indices = torch.cat([pos_prop_indices, neg_prop_indices], dim=0)
+        # Random shuffling
+        shuffled_pos = torch.randperm(pos_proposal_indices.shape[0])
+        pos_sample = pos_proposal_indices[shuffled_pos[:num_pos]]
 
-        # filter boxes if they satisfy IoU condition
-        pred_class_logits = pred_class_logits[pred_indices]
-        proposals = proposals[pos_prop_indices]
-        pred_deltas = pred_deltas[pos_prop_indices]
+        shuffled_neg = torch.randperm(neg_proposal_indices.shape[0])
+        neg_sample = neg_proposal_indices[shuffled_neg[:num_neg]]
 
-        # Fetching predicted per class deltas
-        pred_class_indices = pred_class_logits.argmax(dim=1).to(torch.int64)
+        pos_gt = pos_gt_indices[shuffled_pos[:num_pos]]
+        neg_gt = neg_gt_indices[shuffled_neg[:num_neg]]
 
-        pred_deltas = pred_deltas.view(-1, self.num_classes, 4)
-        pred_per_class_deltas = pred_deltas[
-            torch.arange(pred_deltas.shape[0]), pred_class_indices[:num_pos], :
-        ]  # for regression loss we use just positive indices
-        pred_bounding_box = apply_deltas_to_boxes(
-            boxes=proposals, deltas=pred_per_class_deltas
-        )
+        # Classification
+        pred_pos = pred_class_logits[pos_sample]
+        pred_neg = pred_class_logits[neg_sample]
+        pred_classification = torch.cat([pred_pos, pred_neg])
 
-        gt_classes_per_pred = gt_class[gt_indices]
-        gt_bounding_boxes_per_pred = gt_bounding_boxes[pos_gt_indices, :]
-        gt_deltas = get_deltas_from_bounding_boxes(
-            gt_bounding_box=gt_bounding_boxes_per_pred,
-            pred_bounding_box=pred_bounding_box,
-        )
-        classification_loss = self.classification_loss_fn(
-            pred_class_logits, gt_classes_per_pred.to(torch.int64)
-        )
-        regression_loss = self.self.regression_loss_fn(pred_per_class_deltas, gt_deltas)
-        print("RCNN", classification_loss, regression_loss)
+        gt_classification = ...
+        classification_loss = self.classification_loss_fn
+
+        # Regression
+        regression_loss = ...
         return classification_loss + regression_loss

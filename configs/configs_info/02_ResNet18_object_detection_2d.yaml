@@ -42,7 +42,7 @@ model:
   necks_and_heads:
     object_detection_2d:
       name: FPNFasterRCNN
-      image_size: [256, 1184] # TODO: set to NEW_H, NEW_W for KITTI
+      image_size: [256, 1184]
       pool_output_size: [7, 7] # shared between RoI and output heads
       num_channels_per_feature_map: [64, 64, 128, 256]
       out_channels: 256
@@ -50,8 +50,8 @@ model:
         - objectness_threshold: 0.5
         - iou_threshold: 0.7
         - pre_nms_filtering: 8000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
-        - top_k_proposals_training: 2000 # per fpn layer
-        - top_k_proposals_testing: 500
+        - top_k_proposals_training: 7 # per fpn layer
+        - top_k_proposals_testing: 1000
         - anchor_generator:
           - sizes: [[64], [128], [256], [512]]
           - aspect_ratios: [0.5, 1, 2]

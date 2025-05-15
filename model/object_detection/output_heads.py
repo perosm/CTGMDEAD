@@ -127,7 +127,6 @@ class OutputHeads(nn.Module):
             class_probits:
 
         """
-        # TODO: Make it work for N > 1
         # 1) clip bounding boxes to fit into image
         bounding_boxes = clip_boxes_to_image(boxes=bounding_boxes, size=self.image_size)
 
