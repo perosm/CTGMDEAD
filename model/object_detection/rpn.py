@@ -261,7 +261,6 @@ class RegionProposalNetwork(nn.Module):
             proposals = apply_deltas_to_boxes(
                 boxes=anchors, deltas=bbox_regression_deltas
             )
-            proposals = clip_boxes_to_image(proposals, self.image_size)
             filtered_objectness_score, proposals = self._filter_proposals(
                 proposals=proposals,
                 objectness_score=objectness_score,

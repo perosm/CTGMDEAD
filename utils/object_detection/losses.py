@@ -132,7 +132,7 @@ class RPNClassificationAndRegressionLoss(nn.Module):
             pred_deltas_sampled, gt_deltas
         )
 
-        return classification_loss + regression_loss
+        return classification_loss + self.regularization_factor * regression_loss
 
 
 class RCNNCrossEntropyAndRegressionLoss(nn.Module):
@@ -143,7 +143,7 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         self.iou_positive_threshold = 0.5
         self.iou_negative_threshold = 0.2
         self.n_cls = 256
-        self.num_classes = 3
+        self.num_classes = 4
         self.regularization_factor = 10.0
         self.classification_loss_fn = nn.CrossEntropyLoss(reduction="mean")
         self.regression_loss_fn = nn.SmoothL1Loss(reduction="mean")
@@ -156,7 +156,7 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         pred_info, gt = inputs
         pred_class_logits, proposals, deltas = pred_info["faster-rcnn"]
-        gt_class, gt_bounding_boxes = gt[..., 0], gt[..., 1:].squeeze(0)
+        gt_class, gt_bounding_boxes = gt[..., 0].squeeze(0), gt[..., 1:].squeeze(0)
 
         return pred_class_logits, proposals, deltas, gt_class, gt_bounding_boxes
 
@@ -168,7 +168,16 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         gt_class: torch.Tensor,
         gt_bounding_boxes: torch.Tensor,
     ) -> torch.Tensor:
-        """ """
+        """
+        Args:
+            pred_class_logits: Predicted class logits tensor of shape (num_proposals, num_classes + 1).
+            pred_deltas: Predicted class logits tensor of shape (num_proposals, 4 * (num_classes + 1)).
+            gt_class: Ground truth classes tensor of shape (num_objects).
+            gt_bounding_box: Ground truth bounding box tensor of shape (num_objects, 4)
+
+        Returns:
+            Faster R-CNN classification and regression loss for the output head.
+        """
         # Computing IoU between gt and all anchors
         iou_matrix = box_iou(boxes1=gt_bounding_boxes, boxes2=proposals)
 
@@ -193,9 +202,6 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         pos_proposal_indices = torch.where(positive_mask)[0]
         neg_proposal_indices = torch.where(negative_mask)[0]
 
-        pos_gt_indices = gt_indices[pos_proposal_indices]
-        neg_gt_indices = gt_indices[neg_proposal_indices]
-
         # Balanced sampling
         num_pos = self.positives_ratio * self.n_cls
         num_pos = min(num_pos, pos_proposal_indices.numel())
@@ -209,17 +215,29 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         shuffled_neg = torch.randperm(neg_proposal_indices.shape[0])
         neg_sample = neg_proposal_indices[shuffled_neg[:num_neg]]
 
-        pos_gt = pos_gt_indices[shuffled_pos[:num_pos]]
-        neg_gt = neg_gt_indices[shuffled_neg[:num_neg]]
+        pos_gt_labels = gt_class[gt_indices[pos_sample]].to(torch.int64)
+        neg_gt_labels = torch.zeros_like(neg_sample).to(torch.int64)
 
         # Classification
         pred_pos = pred_class_logits[pos_sample]
         pred_neg = pred_class_logits[neg_sample]
-        pred_classification = torch.cat([pred_pos, pred_neg])
+        pred_classification = torch.cat([pred_neg, pred_pos])
+        gt_classification = torch.cat([neg_gt_labels, pos_gt_labels])
 
-        gt_classification = ...
-        classification_loss = self.classification_loss_fn
+        classification_loss = self.classification_loss_fn(
+            pred_classification, gt_classification
+        )
 
         # Regression
-        regression_loss = ...
-        return classification_loss + regression_loss
+        pred_deltas = pred_deltas.view(-1, self.num_classes, 4)
+        pred_deltas_pos_per_class = pred_deltas[pos_sample, pos_gt_labels]
+        proposals_pos = proposals[pos_sample]
+        gt_bounding_boxes_per_pred = gt_bounding_boxes[pos_gt_labels]
+        gt_deltas_per_pred = get_deltas_from_bounding_boxes(
+            reference_boxes=gt_bounding_boxes_per_pred,
+            predicted_boxes=proposals_pos,
+        )
+        regression_loss = self.regression_loss_fn(
+            pred_deltas_pos_per_class, gt_deltas_per_pred
+        )
+        return classification_loss + self.regularization_factor * regression_loss

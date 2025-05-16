@@ -50,8 +50,8 @@ model:
         - objectness_threshold: 0.5
         - iou_threshold: 0.7
         - pre_nms_filtering: 8000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
-        - top_k_proposals_training: 7 # per fpn layer
-        - top_k_proposals_testing: 1000
+        - top_k_proposals_training: 20 # per fpn layer
+        - top_k_proposals_testing: 64 # per fpn layer
         - anchor_generator:
           - sizes: [[64], [128], [256], [512]]
           - aspect_ratios: [0.5, 1, 2]
@@ -61,15 +61,15 @@ model:
         - feature_map_names: ["fpn0", "fpn1", "fpn2", "fpn3"]
         - sampling_ratio: 4
       output_heads:
-        - num_classes: 3 # number of classes we are trying to predict
+        - num_classes: 4 # number of classes we are trying to predict + background
         - score_threshold: 0.3
         - iou_threshold: 0.5
-        - top_k_boxes_training: 50
-        - top_k_boxes_testing: 100
+        - top_k_boxes_training: 256
+        - top_k_boxes_testing: 20
 loss:
   object_detection_2d:
     - RPNClassificationAndRegressionLoss
-    # - RCNNCrossEntropyAndRegressionLoss
+    - RCNNCrossEntropyAndRegressionLoss
   # object_detection_3d:
 optimizer:
   name: Adam

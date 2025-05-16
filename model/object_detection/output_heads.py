@@ -114,10 +114,8 @@ class OutputHeads(nn.Module):
         """
         Detections are being filtered in the following order:
             - 1) Clip to fit into image
-            - 2) Boxes with class probability < score_threshold are removed
-            - 3) Pre Non-Max Supression (NMS) filtering
-            - 4) Non-Max Supression (NMS) between proposals for the same ground truth
-            - 5) Pick top K proposals
+            - 2) Pre Non-Max Supression (NMS) filtering
+            - 4) Pick top K proposals
 
         Args:
             bounding_boxes: Bounding boxes .
@@ -130,15 +128,8 @@ class OutputHeads(nn.Module):
         # 1) clip bounding boxes to fit into image
         bounding_boxes = clip_boxes_to_image(boxes=bounding_boxes, size=self.image_size)
 
-        # 2) filter proposals with class probability < score_threshold are remove
+        # 2) filter using NMS
         class_probits = torch.softmax(class_logits, dim=-1)
-        keep = torch.any(class_probits > self.score_threshold, dim=1)
-        bounding_boxes = bounding_boxes[keep]
-        class_logits = class_logits[keep]
-        class_probits = class_probits[keep]
-        deltas = deltas[keep]
-
-        # 3) filter using NMS
         indices = torch.argmax(class_probits, dim=1)
         highest_class_probits = torch.gather(
             class_probits, 1, indices.unsqueeze(-1)
@@ -153,7 +144,7 @@ class OutputHeads(nn.Module):
         class_probits = class_probits[keep]
         deltas = deltas[keep]
 
-        # 4) pick top K proposals
+        # 3) pick top K proposals
         top_k = self.top_k_boxes_training if self.training else self.top_k_boxes_testing
 
         bounding_boxes = bounding_boxes[:top_k]
@@ -172,16 +163,17 @@ class OutputHeads(nn.Module):
             pooled_proposals_per_feature_map.view(num_proposals, -1)
         )
         class_logits = self.classification_head(intermediary)
-        bounding_box_deltas = self.regression_head(intermediary)
+        deltas = self.regression_head(intermediary)
 
-        # bounding_boxes = self._fetch_boxes(
-        #     proposals=proposals,
-        #     bbox_regression_deltas=bounding_box_deltas,
-        #     class_logits=class_logits,
-        # )
-        class_logits, proposals, deltas = self._filter_detections(
-            bounding_boxes=proposals,
-            class_logits=class_logits,
-            deltas=bounding_box_deltas,
-        )
+        if not self.training:
+            bounding_boxes = self._fetch_boxes(
+                proposals=proposals,
+                bbox_regression_deltas=deltas,
+                class_logits=class_logits,
+            )
+            class_logits, proposals, deltas = self._filter_detections(
+                bounding_boxes=proposals,
+                class_logits=class_logits,
+                deltas=deltas,
+            )
         return class_logits, proposals, deltas
