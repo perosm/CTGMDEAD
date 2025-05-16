@@ -73,19 +73,3 @@ class UnetDepthDecoder(nn.Module):
         depth = self.conv(fpn_outputs["fpn0"])
 
         return fpn_outputs, F.interpolate(depth, scale_factor=2, mode="bilinear")
-
-
-if __name__ == "__main__":
-    e4 = torch.zeros((1, 512, 8, 8))
-    e3 = torch.zeros((1, 256, 16, 16))
-    e2 = torch.zeros((1, 128, 32, 32))
-    e1 = torch.zeros((1, 64, 64, 64))
-    e0 = torch.zeros((1, 64, 128, 128))
-
-    decoder = UnetDepthDecoder()
-    y = decoder(e4, e3, e2, e1, e0)
-    gt = torch.zeros((1, 1, 256, 256))
-
-    assert (
-        y.shape == gt.shape
-    ), "Output image should be of same dimensionality as input image!"

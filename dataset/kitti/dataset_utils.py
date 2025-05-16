@@ -187,13 +187,13 @@ def load_utils(tasks: list[str]) -> dict:
     For given tasks returns utility functions to accordingly load the data.
     """
     task_load_type = {
-        TaskEnum.input: input_load_util(),
-        TaskEnum.depth: depth_load_util(),
-        TaskEnum.road_detection: road_detection_load_util(),
-        TaskEnum.object_detection_2d: object_detection_2d_load_util(),
-        TaskEnum.object_detection_3d: object_detection_3d_load_util(),
+        TaskEnum.input: input_load_util,
+        TaskEnum.depth: depth_load_util,
+        TaskEnum.road_detection: road_detection_load_util,
+        TaskEnum.object_detection_2d: object_detection_2d_load_util,
+        TaskEnum.object_detection_3d: object_detection_3d_load_util,
     }
-    return {task: task_load_type[task] for task in tasks}
+    return {task: task_load_type[task]() for task in tasks}
 
 
 ############################## TRANSFORM UTILS ##############################

@@ -24,7 +24,7 @@ class LossSaver(Saver):
         task_loss_per_epoch = self.aggregator.return_aggregated()
         epochs_array = np.arange(0, self.aggregator.epochs)
         total_loss = torch.zeros(self.aggregator.epochs).to(self.device)
-        fig, ax = plt.subplots(len(task_loss_per_epoch.keys()) + 1, 1)
+        fig, ax = plt.subplots(len(task_loss_per_epoch.keys()) + 1, 1, figsize=(16, 10))
         for row, (task, losses) in enumerate(task_loss_per_epoch.items()):
             total_loss_per_task = torch.zeros(self.aggregator.epochs).to(self.device)
             for loss_name, loss_value in losses.items():

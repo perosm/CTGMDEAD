@@ -3,8 +3,8 @@ import cv2
 import torch
 import matplotlib.pyplot as plt
 from torchvision.utils import draw_bounding_boxes
-import dataset.dataset_utils as KITTIUtils
-from dataset.dataset_utils import TaskEnum
+import dataset.kitti.dataset_utils as KITTIUtils
+from dataset.kitti.dataset_utils import TaskEnum
 from utils.object_detection.utils import apply_deltas_to_boxes
 
 

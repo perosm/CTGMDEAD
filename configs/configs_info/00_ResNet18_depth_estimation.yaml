@@ -33,14 +33,13 @@ model:
     pretrained: True
     freeze_epoch: 0
     unfreeze_epoch: 10
-  decoder:
-    depth:
-      name: UnetDepthDecoder
-      in_channels: 512
-      channel_scale_factors: [2, 4, 8, 8]
-      out_channels: 1
-      freeze_epoch: None
-      unfreeze_epoch: None
+  depth_decoder:
+    name: UnetDepthDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    freeze_epoch: None
+    unfreeze_epoch: None
 
 
 

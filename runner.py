@@ -27,7 +27,6 @@ def main():
         default_yaml.update(config_yaml)
 
         train.train(config_yaml)
-        eval.eval(config_yaml)
 
         configs_ran.append(config_numbers.pop(0))
         _write_configs_txt_file(

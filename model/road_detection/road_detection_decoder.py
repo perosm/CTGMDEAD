@@ -63,34 +63,13 @@ class UnetRoadDetectionDecoder(nn.Module):
         )
         self.sigmoid_head = nn.Sigmoid()
 
-    def forward(
-        self,
-        e0: torch.Tensor,
-        e1: torch.Tensor,
-        e2: torch.Tensor,
-        e3: torch.Tensor,
-        e4: torch.Tensor,
-    ) -> torch.Tensor:
-        x = self.layer1(e4, e3)
-        x = self.layer2(x, e2)
-        x = self.layer3(x, e1)
-        x = self.layer4(x, e0)
-        x = self.conv(x)
+    def forward(self, encoder_outputs: dict[str, torch.Tensor]) -> torch.Tensor:
+        fpn3 = self.layer1(encoder_outputs["e4"], encoder_outputs["e3"])
+        fpn2 = self.layer2(fpn3, encoder_outputs["e2"])
+        fpn1 = self.layer3(fpn2, encoder_outputs["e1"])
+        fpn0 = self.layer4(fpn1, encoder_outputs["e0"])
+        road_detection = self.conv(fpn0)
 
-        return self.sigmoid_head(F.interpolate(x, scale_factor=2, mode="bilinear"))
-
-
-if __name__ == "__main__":
-    e4 = torch.zeros((1, 512, 8, 8))
-    e3 = torch.zeros((1, 256, 16, 16))
-    e2 = torch.zeros((1, 128, 32, 32))
-    e1 = torch.zeros((1, 64, 64, 64))
-    e0 = torch.zeros((1, 64, 128, 128))
-
-    decoder = UnetRoadDetectionDecoder()
-    y = decoder(e4, e3, e2, e1, e0)
-    gt = torch.zeros((1, 1, 256, 256))
-
-    assert (
-        y.shape == gt.shape
-    ), "Output image should be of same dimensionality as input image!"
+        return self.sigmoid_head(
+            F.interpolate(road_detection, scale_factor=2, mode="bilinear")
+        )

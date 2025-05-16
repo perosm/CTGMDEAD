@@ -1,7 +1,6 @@
 import os
 import re
 import pathlib
-from typing import Any
 import logging
 
 import torch
@@ -9,11 +8,10 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
 from torch.optim import Optimizer, Adam
-import torchvision.transforms.functional as F
 from utils.shared.savers.Saver import Saver
 from utils.shared.savers.LossSaver import LossSaver
 from utils.shared.aggregators.Aggregator import Aggregator
-from utils.shared.aggregators.LossAggregator import LossAggregator
+from utils.shared.metrics import MultiTaskMetrics
 
 from dataset.kitti.KittiDataset import KittiDataset
 from model.resnet import ResNet18, ResNet
@@ -42,6 +40,20 @@ from utils.depth.prediction_postprocessor import (
 )
 from utils.road_detection.prediction_postprocessor import (
     PredictionPostprocessor as RoadPredictionPostprocessor,
+)
+from utils.depth.metrics import (
+    MaskedAverageRelativeError,
+    MaskedMeanAbsoluteError,
+    MaskedRMSE,
+    MaskedThresholdAccracy,
+)
+
+from utils.road_detection.metrics import (
+    IoU,
+    Precision,
+    Recall,
+    FalsePositiveRate,
+    TrueNegativeRate,
 )
 
 
@@ -106,12 +118,18 @@ def configure_logger(save_dir: pathlib.Path, module_name: str) -> logging.Logger
 ############################## MODEL UTILS ##############################
 def configure_model(model_configs: dict, device: torch.device) -> nn.Module:
     encoder = _configure_encoder(model_configs["encoder"]).to(device)
-    decoder = _configure_decoder(model_configs["decoder"]).to(device)
+    depth_decoder = _configure_decoder(model_configs["depth_decoder"]).to(device)
+    road_detection_decoder = _configure_decoder(
+        model_configs.get("road_detection_decoder", None)
+    ).to(device)
     necks_and_heads = _configure_necks_and_heads(
-        model_configs["necks_and_heads"], device
+        model_configs.get("necks_and_heads", None), device
     )
     model = MultiTaskNetwork(
-        encoder=encoder, decoder=decoder, heads_and_necks=necks_and_heads
+        encoder=encoder,
+        depth_decoder=depth_decoder,
+        road_detection_decoder=road_detection_decoder,
+        heads_and_necks=necks_and_heads,
     )
     print_model_size(model)
 
@@ -125,7 +143,13 @@ def _configure_encoder(encoder_configs: dict) -> nn.Module:
 
 
 def _configure_decoder(decoder_configs: dict) -> nn.Module:
-    decoder_dict = {UnetDepthDecoder.__name__: UnetDepthDecoder}
+    decoder_dict = {
+        UnetDepthDecoder.__name__: UnetDepthDecoder,
+        UnetRoadDetectionDecoder.__name__: UnetRoadDetectionDecoder,
+    }
+
+    if not decoder_configs:
+        return None
 
     return decoder_dict[decoder_configs["name"]](
         decoder_configs["in_channels"],
@@ -139,6 +163,9 @@ def _configure_necks_and_heads(
 ) -> nn.Module:
     necks_and_heads = {}
     necks_and_heads_dict = {FPNFasterRCNN.__name__: FPNFasterRCNN}
+
+    if not necks_and_heads_configs:
+        return None
 
     for task in necks_and_heads_configs.keys():
         necks_and_heads_info = necks_and_heads_configs[task]
@@ -178,9 +205,13 @@ def freeze_model(
     if model_configs["encoder"][command] == epoch:
         freeze_params(model.encoder, freeze)
 
-    for task in model_configs["decoder"].keys():
-        if model_configs["decoder"][command] == epoch:
-            freeze_params(model.decoders[task], freeze)
+    if model_configs["depth_decoder"][command] == epoch:
+        freeze_params(model.depth_decoder, freeze)
+
+    road_detection_decoder_configs = model_configs.get("road_detection_decoder", None)
+    if road_detection_decoder_configs:
+        if road_detection_decoder_configs[command] == epoch:
+            freeze_params(model.road_detection_decoder, freeze)
 
 
 def freeze_params(
@@ -257,4 +288,24 @@ def configure_prediction_postprocessor(tasks: list[str]):
 
 ############################## TEST UTILS ##############################
 def configure_metrics(metric_configs):
-    pass
+    metrics_dict = {
+        # depth metrics
+        MaskedAverageRelativeError.__name__: MaskedAverageRelativeError,
+        MaskedMAE.__name__: MaskedMAE,
+        MaskedMeanAbsoluteError.__name__: MaskedMeanAbsoluteError,
+        MaskedRMSE.__name__: MaskedRMSE,
+        MaskedThresholdAccracy.__name__: MaskedThresholdAccracy,
+        # road detection metrics
+        IoU.__name__: IoU,
+        Precision.__name__: Precision,
+        Recall.__name__: Recall,
+        TrueNegativeRate.__name__: TrueNegativeRate,
+        FalsePositiveRate.__name__: FalsePositiveRate,
+        # object detection metrics
+    }
+    task_metrics = {task: [] for task in metric_configs.keys()}
+    for task in metric_configs.keys():
+        for loss_name in metric_configs[task]:
+            task_metrics[task].append(metrics_dict[loss_name]())
+
+    return MultiTaskMetrics(task_metrics)

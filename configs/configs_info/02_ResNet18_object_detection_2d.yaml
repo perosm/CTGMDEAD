@@ -32,7 +32,7 @@ model:
     pretrained: True
     freeze_epoch: -1
     unfreeze_epoch: -1
-  decoder:
+  depth_decoder:
     name: UnetDepthDecoder
     in_channels: 512
     channel_scale_factors: [2, 4, 8, 8]
@@ -50,7 +50,7 @@ model:
         - objectness_threshold: 0.5
         - iou_threshold: 0.7
         - pre_nms_filtering: 8000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
-        - top_k_proposals_training: 20 # per fpn layer
+        - top_k_proposals_training: 32 # per fpn layer
         - top_k_proposals_testing: 64 # per fpn layer
         - anchor_generator:
           - sizes: [[64], [128], [256], [512]]

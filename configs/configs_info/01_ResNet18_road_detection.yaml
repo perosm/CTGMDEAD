@@ -31,16 +31,22 @@ model:
   encoder:
     name: ResNet18
     pretrained: True
-    freeze_epoch: 0
-    unfreeze_epoch: 10
-  decoder:
-    road_detection:
-      name: UnetRoadDetectionDecoder
-      in_channels: 512
-      channel_scale_factors: [2, 4, 8, 8]
-      out_channels: 1
-      freeze_epoch: None
-      unfreeze_epoch: None
+    freeze_epoch: -1
+    unfreeze_epoch: -1
+  depth_decoder:
+    name: UnetDepthDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    freeze_epoch: None
+    unfreeze_epoch: None
+  road_detection_decoder:
+    name: UnetRoadDetectionDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    freeze_epoch: None
+    unfreeze_epoch: None
 
 loss:
   road_detection:
@@ -50,10 +56,14 @@ optimizer:
   name: Adam
   lr: 1e-4
 
-epochs: 20
+epochs: 1000
 
 metrics:
   road_detection:
-    - #TODO:
+    - IoU
+    - Precision
+    - Recall
+    - FalsePositiveRate
+    - TrueNegativeRate
 
 save_path: ../run_info

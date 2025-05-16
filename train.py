@@ -1,5 +1,7 @@
 import torch
 import logging
+import eval
+
 from tqdm import tqdm
 from utils.shared.visual_inspection import (
     plot_task_gt,
@@ -9,7 +11,7 @@ from utils.shared.aggregators.LossAggregator import LossAggregator
 from utils.shared.savers.LossSaver import LossSaver
 
 
-from utils.kitti.utils import (
+from utils.shared.utils import (
     prepare_save_directories,
     configure_dataset,
     configure_dataloader,
@@ -18,7 +20,6 @@ from utils.kitti.utils import (
     configure_optimizer,
     configure_loss,
     configure_logger,
-    configure_prediction_postprocessor,
 )
 
 
@@ -35,7 +36,6 @@ def train(args: dict):
     train_dataloader = configure_dataloader(args["train"]["dataloader"], dataset)
 
     model = configure_model(args["model"], device).to(device)
-    # prediction_postprocessor = configure_prediction_postprocessor(tasks=args["tasks"])
     losses = configure_loss(args["loss"])
     optimizer = configure_optimizer(model, args["optimizer"])
     epochs = args["epochs"]
@@ -63,21 +63,19 @@ def train(args: dict):
             logging.INFO,
             f"epoch: {epoch}; loss: {loss}, per_batch_task_losses: {per_batch_task_losses}",
         )
+        if epoch % 100:
+            eval.eval(args, model, epoch)
 
-        if epoch % 10 == 0:
-            images_dir = save_dir / "images"
-            images_dir.mkdir(parents=True, exist_ok=True)
-            plot_object_detection_predictions_2d(
-                data["input"],
-                pred["object_detection_2d"],
-                data["object_detection_2d"],
-                images_dir / f"{epoch}.png",
-            )
+        # if epoch % 10 == 0:
+        #     images_dir = save_dir / "images"
+        #     images_dir.mkdir(parents=True, exist_ok=True)
+        #     plot_object_detection_predictions_2d(
+        #         data["input"],
+        #         pred["object_detection_2d"],
+        #         data["object_detection_2d"],
+        #         images_dir / f"{epoch}.png",
+        #     )
     loss_saver.save_plot()
     torch.save(model.state_dict(), save_dir / "model.pth")
 
     return
-
-
-if __name__ == "__main__":
-    train()

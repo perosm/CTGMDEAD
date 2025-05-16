@@ -3,7 +3,7 @@ import pathlib
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
 from torch.utils.data import DataLoader
-import dataset.dataset_utils as KITTIutils
+import dataset.kitti.dataset_utils as KITTIutils
 
 
 class KittiDataset(Dataset):
