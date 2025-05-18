@@ -13,6 +13,7 @@ class MaskedAverageRelativeError(nn.Module):
         # used for picking N worst frames
         # lower MaskedAverageRelative = better -> False
         self.higher = False
+        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         mask = torch.where(gt != 0, 1, 0).to(DEVICE)
@@ -31,6 +32,7 @@ class MaskedRMSE(nn.Module):
         # used for picking N worst frames
         # lower MaskedRMSE = better -> False
         self.higher = False
+        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         mask = torch.where(gt != 0, 1, 0).to(DEVICE)
@@ -49,6 +51,7 @@ class MaskedThresholdAccracy(nn.Module):
         # higher MaskedThresholdAcuraccy = better -> True
         self.higher = True
         self.threshold = threshold
+        self.eval()
 
     def forward(self, pred, gt) -> torch.Tensor:
         mask = torch.where(gt != 0, 1, 0).to(DEVICE)
@@ -71,6 +74,7 @@ class MaskedMeanAbsoluteError(nn.Module):
         # used for picking N worst frames
         # lower MaskedMAE = better -> False
         self.higher = False
+        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         mask = torch.where(gt != 0, 1, 0).to(DEVICE)

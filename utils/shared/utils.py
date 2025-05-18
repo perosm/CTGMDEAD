@@ -55,6 +55,7 @@ from utils.road_detection.metrics import (
     FalsePositiveRate,
     TrueNegativeRate,
 )
+from utils.object_detection.metrics import mAP
 
 
 def prepare_save_directories(args: dict, subfolder_name="train") -> None:
@@ -121,7 +122,10 @@ def configure_model(model_configs: dict, device: torch.device) -> nn.Module:
     depth_decoder = _configure_decoder(model_configs["depth_decoder"]).to(device)
     road_detection_decoder = _configure_decoder(
         model_configs.get("road_detection_decoder", None)
-    ).to(device)
+    )
+    if road_detection_decoder:
+        road_detection_decoder = road_detection_decoder.to(device)
+
     necks_and_heads = _configure_necks_and_heads(
         model_configs.get("necks_and_heads", None), device
     )
@@ -302,10 +306,11 @@ def configure_metrics(metric_configs):
         TrueNegativeRate.__name__: TrueNegativeRate,
         FalsePositiveRate.__name__: FalsePositiveRate,
         # object detection metrics
+        mAP.__name__: mAP,
     }
     task_metrics = {task: [] for task in metric_configs.keys()}
     for task in metric_configs.keys():
-        for loss_name in metric_configs[task]:
-            task_metrics[task].append(metrics_dict[loss_name]())
+        for metric_name in metric_configs[task]:
+            task_metrics[task].append(metrics_dict[metric_name]())
 
     return MultiTaskMetrics(task_metrics)

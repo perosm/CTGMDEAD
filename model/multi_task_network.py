@@ -19,6 +19,28 @@ class MultiTaskNetwork(nn.Module):
         self.road_detection_decoder = road_detection_decoder
         self.heads_and_necks = heads_and_necks
 
+    def train(self, mode=True):
+        """
+        # https://docs.pytorch.org/docs/stable/_modules/torch/nn/modules/module.html#Module.train
+        The reason for overriding this function is because heads and necks is a dict
+        where keys are strings and values are nn.Modules so we can't fetch if through
+        self.children(). This is important because FPN Faster R-CNN module, which is
+        stored inside the heads_and_necks dict, operates in a single way when we are training
+        a model (i.e. model.train()), and in another way when we are evaluating (i.e. model.eval()).
+        In the above provided link you can see the original implementation.
+        """
+        if not isinstance(mode, bool):
+            raise ValueError("training mode is expected to be boolean")
+        self.training = mode
+        for module in self.children():
+            module.train(mode)
+
+        # Added
+        for task, module in self.heads_and_necks.items():
+            module.train(mode)
+
+        return self
+
     def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         task_outputs = {}
         encoder_outputs = self.encoder(x)

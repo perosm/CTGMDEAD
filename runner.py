@@ -49,6 +49,13 @@ def _parse_args() -> argparse.Namespace:
         "from one of the subfolders from /configs/ folder",
     )
 
+    parser.add_argument(
+        "--cntr",
+        "--config-numbers-track-ran",
+        type=pathlib.Path,
+        default=pathlib.Path("./configs/config_numbers_track_ran.txt"),
+    )
+
     return parser.parse_args()
 
 

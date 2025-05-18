@@ -1,9 +1,11 @@
 import torch
 from torch import nn
+from torchvision.ops import remove_small_boxes, clip_boxes_to_image, batched_nms
 from model.object_detection.rpn import RegionProposalNetwork
 from model.object_detection.roi import ROINetwork
 from model.object_detection.output_heads import OutputHeads
 from utils.shared.dict_utils import list_of_dict_to_dict
+from utils.object_detection.utils import apply_deltas_to_boxes
 
 
 class FPNFasterRCNNLinkerBlock(nn.Module):
@@ -56,6 +58,8 @@ class FPNFasterRCNN(nn.Module):
         self.pool_output_size = configs["pool_output_size"]
         self.num_channels_per_feature_map = configs["num_channels_per_feature_map"]
         self.out_channels = configs["out_channels"]
+        self.probability_threshold = configs["probability_threshold"]
+        self.iou_threshold = configs["iou_threshold"]
         self.linker_layer = self._configure_linker_layer(
             num_channels_per_feature_map=self.num_channels_per_feature_map,
             out_channels=self.out_channels,
@@ -105,11 +109,105 @@ class FPNFasterRCNN(nn.Module):
             image_size=self.image_size,
             pool_size=self.pool_output_size,
             num_classes=output_heads_config["num_classes"],
-            score_threshold=output_heads_config["score_threshold"],
-            iou_threshold=output_heads_config["iou_threshold"],
-            top_k_boxes_training=output_heads_config["top_k_boxes_training"],
-            top_k_boxes_testing=output_heads_config["top_k_boxes_testing"],
         )
+
+    def _fetch_probabilities_boxes_and_labels(
+        self,
+        proposals: torch.Tensor,
+        bbox_regression_deltas: torch.Tensor,
+        class_logits: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Selects the best bounding box deltas per proposal based on predicted class labels,
+        then applies deltas to proposals to generate final bounding boxes.
+
+        Args:
+            proposals: Filtered proposals in a single image of shape (num_proposals, 4).
+            bbox_regression_deltas: Deltas for all classes, shape (num_proposals, num_classes * 4).
+            class_logits: Class logits of shape (num_proposals, num_classes).
+
+        Returns:
+            Class probabilities of shape (num_proposals).
+            Bounding boxes of shape (num_proposals, 4).
+            Labels of for each of the bounding boxes (num_proposals).
+        """
+
+        class_probits = torch.softmax(class_logits, dim=-1)
+        labels = torch.argmax(class_probits, dim=-1)
+        class_probits = class_probits[torch.arange(class_probits.shape[0]), labels]
+        bbox_regression_deltas = bbox_regression_deltas.view(
+            -1, class_logits.shape[-1], 4
+        )
+        bbox_regression_deltas = torch.gather(
+            bbox_regression_deltas,
+            1,
+            labels.view(-1, 1, 1).expand(-1, 1, 4),
+        ).squeeze(1)
+        bounding_boxes = apply_deltas_to_boxes(
+            boxes=proposals, deltas=bbox_regression_deltas
+        )
+
+        return class_probits, bounding_boxes, labels
+
+    def _filter_boxes(
+        self,
+        bounding_boxes: torch.Tensor,
+        class_probits: torch.Tensor,
+        labels: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Args:
+            bounding_boxes: Predicted bounding boxes (num_boxes, 4).
+            class_probits: Predicted class logits (num_boxes, num_classes)
+            labels: Predicted class labels (num_boxes).
+
+        Final predicted boxes are filtered in the next few steps:
+            - 1) Clip boxes that go outside of frame.
+            - 2) Remove small boxes.
+            - 3) Remove boxes with background labels.
+            - 4) Remove boxes with small probability.
+            - 5) Remove overlapping objects of same class using Non-max suppresion (NMS).
+
+        Returns:
+            bounding_boxes: Filtered bounding boxes tensor (filtered_num_boxes, 4).
+            class_probits: Filtered class probability for each of the bounding boxes (filtered_num_boxes).
+            class_labels: Filtered class label for each of the bounding boxes (filtered_num_boxes).
+        """
+        # 1) Clipping boxes that go outside of frame
+        bounding_boxes = clip_boxes_to_image(boxes=bounding_boxes, size=self.image_size)
+
+        # 2) Remove small boxes
+        keep = remove_small_boxes(
+            boxes=bounding_boxes, min_size=16
+        )  # TODO: to which value do we set this?
+        bounding_boxes = bounding_boxes[keep]
+        class_probits = class_probits[keep]
+        labels = labels[keep]
+
+        # 3) Remove boxes with highest probability of being a background
+        keep = labels != 0
+        bounding_boxes = bounding_boxes[keep]
+        class_probits = class_probits[keep]
+        labels = labels[keep]
+
+        # 4) Removing boxes with small probability
+        keep = class_probits > self.probability_threshold
+        bounding_boxes = bounding_boxes[keep]
+        class_probits = class_probits[keep]
+        labels = labels[keep]
+
+        # 5) Remove overlapping objects of same class using Non-max suppresion (NMS).
+        keep = batched_nms(
+            boxes=bounding_boxes,
+            scores=class_probits,
+            idxs=labels,
+            iou_threshold=self.iou_threshold,
+        )
+        bounding_boxes = bounding_boxes[keep]
+        class_probits = class_probits[keep]
+        labels = labels[keep]
+
+        return class_probits, bounding_boxes, labels
 
     def forward(self, fpn_outputs: dict[str, torch.Tensor]) -> torch.Tensor:
         fpn_outputs = self.linker_layer(fpn_outputs=fpn_outputs)
@@ -141,4 +239,17 @@ class FPNFasterRCNN(nn.Module):
                 "faster-rcnn": (class_logits, filtered_proposals, proposal_deltas),
             }
 
-        return class_logits, filtered_proposals, proposal_deltas
+        class_probits, pred_bounding_boxes, labels = (
+            self._fetch_probabilities_boxes_and_labels(
+                proposals=filtered_proposals,
+                bbox_regression_deltas=proposal_deltas,
+                class_logits=class_logits,
+            )
+        )
+
+        class_probits, pred_bounding_boxes, labels = self._filter_boxes(
+            bounding_boxes=pred_bounding_boxes,
+            class_probits=class_probits,
+            labels=labels,
+        )
+        return class_probits, pred_bounding_boxes, labels

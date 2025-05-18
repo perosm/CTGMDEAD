@@ -154,63 +154,29 @@ def draw_3d_bbox(image_3d_bboxes: np.ndarray, projected_points: np.ndarray):
 def plot_object_detection_predictions_2d(
     input_image: torch.Tensor,
     predicted_bounding_boxes: torch.Tensor,
-    ground_truth_boxes: torch.Tensor,
+    ground_truth: torch.Tensor,
     save_name,
 ):
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 16))
-    image_rpn = input_image.squeeze(0).detach().cpu().to(torch.uint8).clone()
-    image_faster_rcnn = input_image.squeeze(0).detach().cpu().to(torch.uint8).clone()
-    (
-        anchors,
-        all_objectness_scores,
-        anchor_deltas,
-        filtered_objectness_scores,
-        proposals,
-    ) = predicted_bounding_boxes["rpn"]
-    _, top_k_boxes_rpn_indices = torch.topk(all_objectness_scores, k=10)
-    anchors = anchors[top_k_boxes_rpn_indices]
-    anchor_deltas = anchor_deltas[top_k_boxes_rpn_indices]
-    anchors = apply_deltas_to_boxes(anchors, anchor_deltas)
-    anchors = anchors.detach().cpu()
-
-    pred_class_logits, filtered_proposals, proposal_deltas = predicted_bounding_boxes[
-        "faster-rcnn"
-    ]
-    # _, top_k_boxes_faster = torch.topk()
-    pred_class_indices = pred_class_logits.argmax(dim=1).to(torch.int64)
-    pred_per_class_deltas = proposal_deltas.view(-1, proposal_deltas.shape[-1] // 4, 4)[
-        torch.arange(pred_class_indices.shape[0]), pred_class_indices, :
-    ]
-
-    pred_bounding_box = apply_deltas_to_boxes(
-        boxes=filtered_proposals, deltas=pred_per_class_deltas
-    )
-    pred_bounding_box = pred_bounding_box.detach()
-
-    ground_truth_boxes = ground_truth_boxes.squeeze(0).cpu().to(torch.int64)[:, 1:]
+    fig, ax = plt.subplots(1, 1, figsize=(20, 16))
+    input_image = input_image.squeeze(0).detach().cpu().to(torch.uint8).clone()
+    pred_class_probits, pred_boxes, pred_labels = predicted_bounding_boxes
+    ground_truth_boxes = ground_truth.squeeze(0).cpu().to(torch.int64)[:, 1:]
+    groun_truth_labels = ground_truth.squeeze(0).cpu().to(torch.int64)[:, :1]
     red = (255, 0, 0)
     green = (0, 255, 0)
-    image_rpn = draw_bounding_boxes(
-        image=image_rpn,
-        boxes=anchors.squeeze().to(torch.int64),
+    print(pred_boxes.shape, pred_labels.shape)
+    input_image = draw_bounding_boxes(
+        image=input_image,
+        boxes=pred_boxes.detach().cpu().squeeze().to(torch.int64),
+        labels=[str(int(pred_label.item())) for pred_label in pred_labels],
         colors=red,
     )
-    image_rpn = draw_bounding_boxes(
-        image=image_rpn,
+    input_image = draw_bounding_boxes(
+        image=input_image,
         boxes=ground_truth_boxes,
+        labels=[str(int(gt_label.item())) for gt_label in groun_truth_labels],
         colors=green,
     )
-    image_faster_rcnn = draw_bounding_boxes(
-        image=image_faster_rcnn,
-        boxes=pred_bounding_box.squeeze().to(torch.int64),
-        colors=red,
-    )
-    image_faster_rcnn = draw_bounding_boxes(
-        image=image_faster_rcnn,
-        boxes=ground_truth_boxes,
-        colors=green,
-    )
-    ax1.imshow(image_rpn.permute(1, 2, 0).numpy())
-    ax2.imshow(image_faster_rcnn.permute(1, 2, 0).numpy())
+    ax.imshow(input_image.permute(1, 2, 0))
     plt.tight_layout()
     plt.savefig(save_name)

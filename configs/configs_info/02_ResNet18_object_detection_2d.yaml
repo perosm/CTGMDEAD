@@ -23,7 +23,7 @@ train:
 eval:
   dataloader:
     batch_size: 1
-    shuffle: True
+    shuffle: False
     num_workers: 1
 
 model:
@@ -46,12 +46,14 @@ model:
       pool_output_size: [7, 7] # shared between RoI and output heads
       num_channels_per_feature_map: [64, 64, 128, 256]
       out_channels: 256
+      probability_threshold: 0.1
+      iou_threshold: 0.5
       rpn:
         - objectness_threshold: 0.5
         - iou_threshold: 0.7
         - pre_nms_filtering: 8000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
-        - top_k_proposals_training: 32 # per fpn layer
-        - top_k_proposals_testing: 64 # per fpn layer
+        - top_k_proposals_training: 8 # per fpn layer
+        - top_k_proposals_testing: 2 # per fpn layer
         - anchor_generator:
           - sizes: [[64], [128], [256], [512]]
           - aspect_ratios: [0.5, 1, 2]
@@ -63,9 +65,8 @@ model:
       output_heads:
         - num_classes: 4 # number of classes we are trying to predict + background
         - score_threshold: 0.3
-        - iou_threshold: 0.5
         - top_k_boxes_training: 256
-        - top_k_boxes_testing: 20
+        - top_k_boxes_testing: 2
 loss:
   object_detection_2d:
     - RPNClassificationAndRegressionLoss
@@ -73,12 +74,12 @@ loss:
   # object_detection_3d:
 optimizer:
   name: Adam
-  lr: 1e-4
+  lr: 1e-6
 
 epochs: 1000
 
 metrics:
-  depth:
-    - MaskedMAE
+  object_detection_2d:
+    - mAP
 
 save_path: ../run_info/

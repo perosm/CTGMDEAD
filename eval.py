@@ -9,7 +9,7 @@ from utils.shared.utils import (
     configure_prediction_postprocessor,
     prepare_save_directories,
 )
-
+from utils.shared.visual_inspection import plot_object_detection_predictions_2d
 from utils.shared.aggregators.MetricsAggregator import MetricsAggregator
 from utils.shared.savers.MetricSavers import MetricsSaver
 
@@ -37,7 +37,16 @@ def eval(args: dict, model: nn.Module, epoch: int | None):
     data = {task: data[task].to(device) for task in data.keys()}
     pred = model(data["input"])
     # pred = prediction_postprocessor(pred)
-    per_batch_task_metrics = metrics(pred, data)
-    metrics_aggregator.aggregate_per_batch(per_batch_task_metrics)
+    images_dir = save_dir / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+    plot_object_detection_predictions_2d(
+        data["input"],
+        pred["object_detection_2d"],
+        data["object_detection_2d"],
+        images_dir / f"{epoch}.png",
+    )
+    model.train()
+    # per_batch_task_metrics = metrics(pred, data)
+    # metrics_aggregator.aggregate_per_batch(per_batch_task_metrics)
 
-    metrics_saver.save()
+    # metrics_saver.save()

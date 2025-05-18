@@ -22,5 +22,5 @@ class MetricsSaver(Saver):
 
     def save(self) -> None:
         per_task_metrics = self.aggregator.return_aggregated()
-        with open(self.save_dir / f"{self.name}.json") as f:
+        with open(self.save_dir / f"{self.name}.json", "w") as f:
             json.dump(per_task_metrics, f)

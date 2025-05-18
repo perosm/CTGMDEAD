@@ -6,6 +6,6 @@ class PredictionPostprocessor:
         super().__init__()
 
     def __call__(
-        self, input: dict[str, tuple[torch.Tensor, ...]]
+        self, pred: dict[str, tuple[torch.Tensor, ...]]
     ) -> dict[str, tuple[torch.Tensor, ...]]:
-        return input  # TODO: Should there be any postprocessing ?
+        return pred  # TODO: Should there be any postprocessing ?

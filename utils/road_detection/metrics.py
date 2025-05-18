@@ -6,12 +6,13 @@ class IoU(nn.Module):
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
+        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
-        pred = (pred > self.threshold).to(torch.int8)
-        gt = gt.to(torch.int8)
-        intersection = torch.sum((pred & gt) == 1)
-        union = torch.sum((pred | gt) == 1)
+        pred = (pred > self.threshold).bool()
+        gt = gt.bool()
+        intersection = (pred & gt).sum()
+        union = (pred | gt).sum()
 
         return intersection / union
 
@@ -20,26 +21,28 @@ class Precision(nn.Module):
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
+        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
-        pred = (pred > self.threshold).to(torch.int8)
-        gt = gt.to(torch.int8)
-        tp = torch.sum((pred & gt) == 1)
-        tn = torch.sum((~pred & ~gt) == 1)
+        pred = (pred > self.threshold).bool()
+        gt = gt.bool()
+        tp = (pred & gt).sum()
+        fp = (pred & ~gt).sum()
 
-        return tp / (tp + tn)
+        return tp / (tp + fp)
 
 
 class Recall(nn.Module):
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
+        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
-        pred = (pred > self.threshold).to(torch.int8)
-        gt = gt.to(torch.int8)
-        tp = torch.sum((pred & gt) == 1)
-        fn = torch.sum((~pred & gt) == 1)
+        pred = (pred > self.threshold).bool()
+        gt = gt.bool()
+        tp = (pred & gt).sum()
+        fn = (~pred & gt).sum()
 
         return tp / (tp + fn)
 
@@ -48,12 +51,13 @@ class FalsePositiveRate(nn.Module):
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
+        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
-        pred = (pred > self.threshold).to(torch.int8)
-        gt = gt.to(torch.int8)
-        fp = torch.sum((pred & ~gt) == 1)
-        tn = torch.sum((~pred & ~gt) == 1)
+        pred = (pred > self.threshold).bool()
+        gt = gt.bool()
+        fp = (pred & ~gt).sum()
+        tn = (~pred & ~gt).sum()
 
         return fp / (fp + tn)
 
@@ -62,11 +66,30 @@ class TrueNegativeRate(nn.Module):
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
+        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
-        pred = (pred > self.threshold).to(torch.int8)
-        gt = gt.to(torch.int8)
-        fp = torch.sum((pred & ~gt) == 1)
-        tn = torch.sum((~pred & ~gt) == 1)
+        pred = (pred > self.threshold).bool()
+        gt = gt.bool()
+        fp = (pred & ~gt).sum()
+        tn = (~pred & ~gt).sum()
 
         return tn / (tn + fp)
+
+
+class F1Score(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.threshold = 0.5
+        self.eval()
+
+    def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
+        pred = (pred > self.threshold).bool()
+        gt = gt.bool()
+        tp = (pred & gt).sum()
+        fp = (pred & ~gt).sum()
+        fn = (~pred & gt).sum()
+        precision = tp / (tp + fp)
+        recall = tp / (tp + fn)
+        return 2 * precision * recall / (precision + recall)

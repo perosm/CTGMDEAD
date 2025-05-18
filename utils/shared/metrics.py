@@ -9,6 +9,7 @@ class MultiTaskMetrics(nn.Module):
     def __init__(self, task_metrics: dict[str, list[nn.Module]]):
         super().__init__()
         self.task_metrics = task_metrics
+        self.eval()
 
     def forward(
         self, pred: dict[str, torch.Tensor], gt: dict[str, torch.Tensor]
@@ -19,7 +20,7 @@ class MultiTaskMetrics(nn.Module):
 
         for task, metrics in self.task_metrics.items():
             for metric in metrics:
-                per_task_metrics[task][metrics.__class__.__name__] = metric(
+                per_task_metrics[task][metric.__class__.__name__] = metric(
                     pred[task], gt[task]
                 )
 

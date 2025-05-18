@@ -21,11 +21,8 @@ train:
   savers:
     LossSaver: LossAggregator # bind aggregator to saver
 
-eval:
-  dataloader:
-    batch_size: 1
-    shuffle: False
-    num_workers: 1
+epochs: 30
+
 
 model:
   encoder:
@@ -48,6 +45,8 @@ model:
     freeze_epoch: None
     unfreeze_epoch: None
 
+prediction_processors: [road_detection]
+
 loss:
   road_detection:
     - BinaryCrossEntropyLoss
@@ -56,7 +55,12 @@ optimizer:
   name: Adam
   lr: 1e-4
 
-epochs: 1000
+
+eval:
+  dataloader:
+    batch_size: 1
+    shuffle: False
+    num_workers: 1
 
 metrics:
   road_detection:
@@ -65,5 +69,6 @@ metrics:
     - Recall
     - FalsePositiveRate
     - TrueNegativeRate
+    - F1Score
 
 save_path: ../run_info

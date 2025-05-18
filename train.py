@@ -63,18 +63,9 @@ def train(args: dict):
             logging.INFO,
             f"epoch: {epoch}; loss: {loss}, per_batch_task_losses: {per_batch_task_losses}",
         )
-        if epoch % 100:
+        if epoch % 25 == 0 and epoch != 0:
             eval.eval(args, model, epoch)
 
-        # if epoch % 10 == 0:
-        #     images_dir = save_dir / "images"
-        #     images_dir.mkdir(parents=True, exist_ok=True)
-        #     plot_object_detection_predictions_2d(
-        #         data["input"],
-        #         pred["object_detection_2d"],
-        #         data["object_detection_2d"],
-        #         images_dir / f"{epoch}.png",
-        #     )
     loss_saver.save_plot()
     torch.save(model.state_dict(), save_dir / "model.pth")
 

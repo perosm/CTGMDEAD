@@ -35,7 +35,9 @@ class MetricsAggregator(Aggregator):
     def _aggregate_per_epoch(self) -> None:
         for task, metrics in self.task_metrics_per_epochs.items():
             for metric_name, _ in metrics.items():
-                self.task_metrics_per_epochs[task][metric_name] /= self.num_batches
+                self.task_metrics_per_epochs[task][metric_name] = (
+                    self.task_metrics_per_epochs[task][metric_name] / self.num_batches
+                ).item()
 
     def return_aggregated(self) -> dict[str, dict[str, torch.Tensor]]:
         return self.task_metrics_per_epochs

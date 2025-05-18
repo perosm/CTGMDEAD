@@ -1,21 +1,16 @@
 import torch
 from torch import nn
-from torchvision.ops import clip_boxes_to_image, nms
 
 
 class OutputHeads(nn.Module):
     rpn_out_channels = 256
-    output_features = 256
+    output_features = 1024
 
     def __init__(
         self,
         image_size: tuple[int, int],
         pool_size: list[int, int],
         num_classes: int,
-        score_threshold: float,
-        iou_threshold: float,
-        top_k_boxes_training: int,
-        top_k_boxes_testing: int,
     ) -> None:
         """
         Regression and classification heads for the Faster RCNN module.
@@ -28,10 +23,6 @@ class OutputHeads(nn.Module):
         self.image_size = image_size
         self.pool_size = pool_size
         self.num_classes = num_classes
-        self.score_threshold = score_threshold
-        self.iou_threshold = iou_threshold
-        self.top_k_boxes_training = top_k_boxes_training
-        self.top_k_boxes_testing = top_k_boxes_testing
         self.fc1 = nn.Linear(
             in_features=self.rpn_out_channels * pool_size[0] * pool_size[1],
             out_features=self.output_features,
@@ -56,104 +47,6 @@ class OutputHeads(nn.Module):
                 if module.bias is not None:
                     nn.init.normal_(module.bias, mean=0, std=0.01)
 
-    def _fetch_boxes(
-        self,
-        proposals: torch.Tensor,
-        bbox_regression_deltas: torch.Tensor,
-        class_logits: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Fetches proposals given anchors and bbox_regression_deltas for each of the anchors.
-
-        Args:
-            - proposals:
-            - bbox_regression_deltas:
-
-        Returns:
-            - bounding_boxes:
-        """
-        # corners of the anchors
-        x1, y1, x2, y2 = proposals.unbind(dim=-1)  # left, top, right, bottom
-        proposal_width = x2 - x1
-        proposal_height = y2 - y1
-        proposal_center_x = x1 + proposal_width / 2
-        proposal_center_y = y1 + proposal_height / 2
-
-        labels = torch.argmax(class_logits, dim=-1)
-        bbox_regression_deltas = bbox_regression_deltas.view(
-            -1, class_logits.shape[-1], 4
-        )
-        labels = labels.unsqueeze(-1).unsqueeze(-1).expand(-1, 1, 4)
-        bbox_regression_deltas = torch.gather(
-            bbox_regression_deltas, 1, labels
-        ).squeeze(1)
-        deltas_x, deltas_y, deltas_w, deltas_h = bbox_regression_deltas.unbind(dim=-1)
-
-        # center coordinates and height, width of predicted bounding box
-        pred_x = proposal_center_x + deltas_x * proposal_width
-        pred_y = proposal_center_y + deltas_y * proposal_height
-        pred_width = proposal_width * torch.exp(deltas_w)
-        pred_height = proposal_height * torch.exp(deltas_h)
-
-        # switching back to corners of predicted bounding box
-        pred_x1 = pred_x - pred_width / 2
-        pred_y1 = pred_y - pred_height / 2
-        pred_x2 = pred_x + pred_width / 2
-        pred_y2 = pred_y + pred_height / 2
-
-        bounding_boxes = torch.stack([pred_x1, pred_y1, pred_x2, pred_y2], dim=-1)
-
-        return bounding_boxes
-
-    def _filter_detections(
-        self,
-        bounding_boxes: torch.Tensor,
-        class_logits: torch.Tensor,
-        deltas: torch.Tensor,
-    ):
-        """
-        Detections are being filtered in the following order:
-            - 1) Clip to fit into image
-            - 2) Pre Non-Max Supression (NMS) filtering
-            - 4) Pick top K proposals
-
-        Args:
-            bounding_boxes: Bounding boxes .
-            class_logits: Class logits
-
-        Returns:
-            class_probits:
-
-        """
-        # 1) clip bounding boxes to fit into image
-        bounding_boxes = clip_boxes_to_image(boxes=bounding_boxes, size=self.image_size)
-
-        # 2) filter using NMS
-        class_probits = torch.softmax(class_logits, dim=-1)
-        indices = torch.argmax(class_probits, dim=1)
-        highest_class_probits = torch.gather(
-            class_probits, 1, indices.unsqueeze(-1)
-        ).squeeze(-1)
-        keep = nms(
-            boxes=bounding_boxes,
-            scores=highest_class_probits,
-            iou_threshold=self.iou_threshold,
-        )
-        bounding_boxes = bounding_boxes[keep]
-        class_logits = class_logits[keep]
-        class_probits = class_probits[keep]
-        deltas = deltas[keep]
-
-        # 3) pick top K proposals
-        top_k = self.top_k_boxes_training if self.training else self.top_k_boxes_testing
-
-        bounding_boxes = bounding_boxes[:top_k]
-        class_logits = class_logits[:top_k]
-        class_probits = class_probits[:top_k]
-        deltas = deltas[:top_k]
-
-        return class_logits, bounding_boxes, deltas
-
     def forward(
         self, pooled_proposals_per_feature_map: torch.Tensor, proposals: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -165,15 +58,4 @@ class OutputHeads(nn.Module):
         class_logits = self.classification_head(intermediary)
         deltas = self.regression_head(intermediary)
 
-        if not self.training:
-            bounding_boxes = self._fetch_boxes(
-                proposals=proposals,
-                bbox_regression_deltas=deltas,
-                class_logits=class_logits,
-            )
-            class_logits, proposals, deltas = self._filter_detections(
-                bounding_boxes=proposals,
-                class_logits=class_logits,
-                deltas=deltas,
-            )
         return class_logits, proposals, deltas
