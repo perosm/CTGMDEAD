@@ -46,7 +46,7 @@ def eval(args: dict, model: nn.Module, epoch: int | None):
         images_dir / f"{epoch}.png",
     )
     model.train()
-    # per_batch_task_metrics = metrics(pred, data)
-    # metrics_aggregator.aggregate_per_batch(per_batch_task_metrics)
+    per_batch_task_metrics = metrics(pred, data)
+    metrics_aggregator.aggregate_per_batch(per_batch_task_metrics)
 
-    # metrics_saver.save()
+    metrics_saver.save()

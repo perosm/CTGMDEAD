@@ -164,7 +164,8 @@ def plot_object_detection_predictions_2d(
     groun_truth_labels = ground_truth.squeeze(0).cpu().to(torch.int64)[:, :1]
     red = (255, 0, 0)
     green = (0, 255, 0)
-    print(pred_boxes.shape, pred_labels.shape)
+    if pred_boxes.shape[0] == 1:
+        return
     input_image = draw_bounding_boxes(
         image=input_image,
         boxes=pred_boxes.detach().cpu().squeeze().to(torch.int64),
