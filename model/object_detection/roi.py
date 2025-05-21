@@ -16,8 +16,8 @@ class ROINetwork(nn.Module):
         self.pool_output_size = pool_output_size
         self.roi_pool = MultiScaleRoIAlign(
             featmap_names=feature_map_names,
-            output_size=7,
-            sampling_ratio=2,
+            output_size=pool_output_size,
+            sampling_ratio=sampling_ratio,
         )
 
     def forward(

@@ -1,15 +1,14 @@
 device: cuda
-tasks: ["object_detection_2d"] # for configuring prediction postprocess
+tasks: ["object_detection_3d"] # for configuring prediction postprocess
 dataset:
   dataset_name: KittiDataset
   task_transform:
     input: 
       - Crop
-    object_detection_2d:
+    object_detection_3d:
   task_paths:
     input: "./data/kitti/input"
-    object_detection_2d: "./data/kitti/object_detection_3d/ground_truth"
-
+    object_detection_3d: "./data/kitti/object_detection_3d/ground_truth"
 train:
   dataloader:
     batch_size: 1
@@ -40,7 +39,7 @@ model:
     freeze_epoch: None
     unfreeze_epoch: None
   necks_and_heads:
-    object_detection_2d:
+    object_detection_3d:
       name: FPNFasterRCNN
       image_size: [256, 1184]
       pool_output_size: [7, 7] # shared between RoI and output heads
@@ -67,11 +66,15 @@ model:
         - score_threshold: 0.3
         - top_k_boxes_training: 256
         - top_k_boxes_testing: 2
+      distance_head:
+        - num_conv_layers: 2
+        - num_fc_layers: 2
+        - fc_features: 1024
+      
 loss:
-  object_detection_2d:
-    - RPNClassificationAndRegressionLoss
+  object_detection_3d: 
     - RCNNCrossEntropyAndRegressionLoss
-  # object_detection_3d:
+
 optimizer:
   name: Adam
   lr: 1e-6

@@ -7,6 +7,8 @@ import dataset.kitti.dataset_utils as KITTIUtils
 from dataset.kitti.dataset_utils import TaskEnum
 from utils.object_detection.utils import apply_deltas_to_boxes
 
+from utils.object_detection_3d.utils import project_3d_boxes_to_image
+
 
 def plot_task_gt(task_ground_truth: dict[str, torch.Tensor]):
     tasks = task_ground_truth.keys()
@@ -48,16 +50,19 @@ def plot_task_gt(task_ground_truth: dict[str, torch.Tensor]):
                 .astype(np.uint8)
                 .copy()
             )
-            ground_truth = ground_truth.detach().cpu().numpy()
+            ground_truth = ground_truth.squeeze(0).detach()
             projection_matrix = (
-                task_ground_truth["projection_matrix"].squeeze(0).detach().cpu().numpy()
+                task_ground_truth["projection_matrix"].squeeze(0).detach()
             )
-            for bounding_box_3d in ground_truth:
 
-                bbox_3d_projected = project_3d_bbox_to_image(
-                    bounding_box_3d, projection_matrix
-                )
-                draw_3d_bbox(image, bbox_3d_projected)
+            boxes_3d_projected = (
+                project_3d_boxes_to_image(ground_truth[:, 1:], projection_matrix)
+                .cpu()
+                .numpy()
+                .astype(np.int16)
+            )
+            for bounding_box_3d in boxes_3d_projected:
+                draw_3d_bbox(image, bounding_box_3d.T)
 
             ax[i + 1].imshow(image)
             ax[i + 1].set_title(f"Task: {task}")
@@ -83,13 +88,6 @@ def plot_task_gt(task_ground_truth: dict[str, torch.Tensor]):
     plt.show()
 
 
-def _read_object_detection_gt_info(object_info: np.ndarray) -> np.ndarray:
-    bbox_2d = np.array([int(float(image_coords)) for image_coords in object_info[4:8]])
-    bbox_3d = np.array([float(world_coords) for world_coords in object_info[8:15]])
-
-    return bbox_2d, bbox_3d
-
-
 def draw_bbox(image: np.ndarray, bbox: np.ndarray):
     left, top, right, bottom = bbox
     # Note: cv2 coordinate system starts at the bottom left of an image
@@ -97,32 +95,6 @@ def draw_bbox(image: np.ndarray, bbox: np.ndarray):
     cv2.line(image, (left, top), (left, bottom), color=(255, 0, 0), thickness=1)
     cv2.line(image, (right, top), (right, bottom), color=(255, 0, 0), thickness=1)
     cv2.line(image, (left, bottom), (right, bottom), color=(255, 0, 0), thickness=1)
-
-
-def project_3d_bbox_to_image(bbox_3d: np.ndarray, projection_matrix: np.ndarray):
-    h, w, l = bbox_3d[0:3]
-    x, y, z = bbox_3d[3:6]
-    rotation_y = bbox_3d[6]
-    R = np.array(
-        [
-            [np.cos(rotation_y), 0, np.sin(rotation_y)],
-            [0, 1, 0],
-            [-np.sin(rotation_y), 0, np.cos(rotation_y)],
-        ]
-    )
-    x_corners = np.array([l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2])
-    y_corners = np.array([0, 0, 0, 0, -h, -h, -h, -h])
-    z_corners = np.array([w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2])
-    corners = np.vstack([x_corners, y_corners, z_corners])
-    corners = R @ corners
-    corners[0, :] += x
-    corners[1, :] += y
-    corners[2, :] += z
-    corners_homogeneous = np.vstack([corners, np.ones(shape=(1, corners.shape[1]))])
-    projections = projection_matrix @ corners_homogeneous
-    projections = projections[:2, :] / projections[2, :]
-
-    return projections.T.astype(np.int16)
 
 
 def draw_3d_bbox(image_3d_bboxes: np.ndarray, projected_points: np.ndarray):
@@ -175,8 +147,9 @@ def plot_object_detection_predictions_2d(
     input_image = draw_bounding_boxes(
         image=input_image,
         boxes=ground_truth_boxes,
-        labels=[str(int(gt_label.item())) for gt_label in groun_truth_labels],
+        # labels=[str(int(gt_label.item())) for gt_label in groun_truth_labels],
         colors=green,
+        fill=True,
     )
     ax.imshow(input_image.permute(1, 2, 0))
     plt.tight_layout()

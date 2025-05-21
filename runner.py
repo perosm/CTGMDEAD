@@ -34,7 +34,7 @@ def main():
         )
         flag = len(config_numbers) != 0
 
-    _write_configs_txt_file(args.config_done_txt_path, configs_ran)
+    _write_configs_txt_file(args.config_numbers_track_ran, configs_ran)
 
 
 def _parse_args() -> argparse.Namespace:

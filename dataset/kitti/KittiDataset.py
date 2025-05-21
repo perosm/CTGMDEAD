@@ -45,6 +45,8 @@ class KittiDataset(Dataset):
         }
 
     def _fetch_projection_matrices(self) -> None:
+        delta_principal_point_x = (KITTIutils.KITTI_W - KITTIutils.NEW_W) / 2
+        delta_principal_point_y = KITTIutils.KITTI_H - KITTIutils.NEW_H
         if not self.paths_dict[KITTIutils.TaskEnum.object_detection_3d]:
             return
 
@@ -61,9 +63,10 @@ class KittiDataset(Dataset):
                     self.UNIQUE_PATH_PARTS_NUMBER :
                 ]
             )
-            self.ground_truth_path_to_projection_matrices[frame_id] = (
-                self._read_projection_matrix(calibrations_path)
-            )
+            projection_matrix = self._read_projection_matrix(calibrations_path)
+            projection_matrix[0, 2] -= delta_principal_point_x
+            projection_matrix[1, 2] -= delta_principal_point_y
+            self.ground_truth_path_to_projection_matrices[frame_id] = projection_matrix
 
     def _read_projection_matrix(self, object_detection_calibration_path: pathlib.Path):
         with open(object_detection_calibration_path, "r") as file:

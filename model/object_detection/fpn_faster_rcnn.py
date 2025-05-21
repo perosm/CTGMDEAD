@@ -4,6 +4,8 @@ from torchvision.ops import remove_small_boxes, clip_boxes_to_image, batched_nms
 from model.object_detection.rpn import RegionProposalNetwork
 from model.object_detection.roi import ROINetwork
 from model.object_detection.output_heads import OutputHeads
+from model.object_detection_3d.distance_head import DistanceHead
+from model.object_detection_3d.attribute_head import AttributeHead
 from utils.shared.dict_utils import list_of_dict_to_dict
 from utils.object_detection.utils import apply_deltas_to_boxes
 
@@ -64,12 +66,20 @@ class FPNFasterRCNN(nn.Module):
             num_channels_per_feature_map=self.num_channels_per_feature_map,
             out_channels=self.out_channels,
         )
-        # TODO: add per feature map RegionProposalNetwork?
+        # Shared
         self.rpn = self._configure_region_proposal_network(rpn_config=configs["rpn"])
         self.roi = self._configure_region_of_interest_network(roi_config=configs["roi"])
+
+        # Object detection 2D
         self.output_heads = self._configure_output_heads(
             output_heads_config=configs["output_heads"]
         )
+
+        # Object detection 3D
+        self.distance_head = self._configure_distance_head(
+            distance_head_config=configs["distance_head"]
+        )
+        self.attribute_head = self._configure_attribute_head(attribute_head_config=None)
 
     def _configure_linker_layer(
         self, num_channels_per_feature_map: list[int], out_channels: int
@@ -110,6 +120,25 @@ class FPNFasterRCNN(nn.Module):
             pool_size=self.pool_output_size,
             num_classes=output_heads_config["num_classes"],
         )
+
+    def _configure_distance_head(
+        self, distance_head_config: list[dict]
+    ) -> DistanceHead:
+        distance_head_config = list_of_dict_to_dict(
+            list_of_dicts=distance_head_config, new_dict={}, depth_cnt=1
+        )
+        return DistanceHead(
+            num_conv_layers=distance_head_config["num_conv_layers"],
+            num_fc_layers=distance_head_config["num_fc_layers"],
+            rpn_output_channels=self.out_channels,
+            pool_output_size=self.pool_output_size,
+            fc_features=distance_head_config["fc_features"],
+        )
+
+    def _configure_attribute_head(
+        self, attribute_head_config: list[dict]
+    ) -> AttributeHead:
+        pass
 
     def _fetch_probabilities_boxes_and_labels(
         self,
@@ -216,17 +245,20 @@ class FPNFasterRCNN(nn.Module):
             all_objectness_scores,  # (num_anchors)
             all_anchor_deltas,  # (num_anchors, 4)
             filtered_objectness_scores,  # (num_proposals)
-            proposals,  # (num_proposals, 4)
+            filtered_proposals,  # (num_proposals, 4)
         ) = self.rpn(fpn_feature_map_outputs=fpn_outputs)
 
         pooled_proposals = self.roi(
             fpn_feature_map_outputs=fpn_outputs,
-            proposals=proposals,
+            proposals=filtered_proposals,
         )
 
         class_logits, filtered_proposals, proposal_deltas = self.output_heads(
-            pooled_proposals_per_feature_map=pooled_proposals, proposals=proposals
+            pooled_proposals_per_feature_map=pooled_proposals,
+            proposals=filtered_proposals,
         )
+
+        distance_head_output = self.distance_head(pooled_proposals, filtered_proposals)
         if self.training:
             return {
                 "rpn": (
@@ -234,7 +266,7 @@ class FPNFasterRCNN(nn.Module):
                     all_objectness_scores,  # (num_anchors)
                     all_anchor_deltas,  # (num_anchors, 4)
                     filtered_objectness_scores,  # (num_proposals)
-                    proposals,  # (num_proposals, 4)
+                    filtered_proposals,  # (num_proposals, 4)
                 ),
                 "faster-rcnn": (class_logits, filtered_proposals, proposal_deltas),
             }

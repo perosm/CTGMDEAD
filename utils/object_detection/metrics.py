@@ -88,7 +88,7 @@ class mAP(nn.Module):
             fp_cumsum = fp.cumsum(dim=-1)
             precision = tp_cumsum / (tp_cumsum + fp_cumsum + self.epsilon)
             recall = fp_cumsum / (num_gt_boxes + self.epsilon)
-            average_precision = (precision / recall).mean()
+            print(f"Precision: {precision}, Recall: {recall}")
+            average_precision = torch.trapezoid(y=precision, x=recall)
             average_precision_per_class[c - 1] = average_precision
-
         return average_precision_per_class.mean()

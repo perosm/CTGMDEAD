@@ -59,11 +59,12 @@ def train(args: dict):
         optimizer.step()
         optimizer.zero_grad()
         loss_aggregator.aggregate_per_batch(per_batch_task_losses)
-        logger.log(
-            logging.INFO,
-            f"epoch: {epoch}; loss: {loss}, per_batch_task_losses: {per_batch_task_losses}",
-        )
+        # logger.log(
+        #     logging.INFO,
+        #     f"epoch: {epoch}; loss: {loss}, per_batch_task_losses: {per_batch_task_losses}",
+        # )
         if epoch % 125 == 0 and epoch != 0:
+            print(f"Epoch: {epoch}")
             eval.eval(args, model, epoch)
 
     loss_saver.save_plot()
