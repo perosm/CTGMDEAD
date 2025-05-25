@@ -73,16 +73,17 @@ model:
       
 loss:
   object_detection_3d: 
-    - RCNNCrossEntropyAndRegressionLoss
+    - RPNClassificationAndRegressionLoss
+    - UncertaintyAwareRegressionLoss
 
 optimizer:
   name: Adam
   lr: 1e-6
 
-epochs: 10000
+epochs: 10
 
 metrics:
-  object_detection_2d:
+  object_detection_3d:
     - mAP
 
 save_path: ../run_info/

@@ -6,12 +6,13 @@ from utils.object_detection.utils import (
     get_deltas_from_bounding_boxes,
 )
 from torchvision.ops import sigmoid_focal_loss
+from utils.shared.enums import ObjectDetectionEnum
 
 
 class RPNClassificationAndRegressionLoss(nn.Module):
-
     def __init__(self, regularization_factor: float = 10.0) -> None:
         super().__init__()
+        self.name = "RPNClassificationAndRegressionLoss"
         self.n_cls = 256
         self.positives_ratio = 0.25
         self.negatives_ratio = 1 - self.positives_ratio
@@ -20,16 +21,21 @@ class RPNClassificationAndRegressionLoss(nn.Module):
         self.regularization_factor = 10.0
         self.classification_loss_fn = nn.BCELoss(reduction="mean").to("cuda")
         self.regression_loss_fn = nn.SmoothL1Loss(reduction="mean").to("cuda")
-        self.register_forward_pre_hook(self._extract_relevant_tensor_info)
+        self.register_forward_pre_hook(
+            RPNClassificationAndRegressionLoss._extract_relevant_tensor_info
+        )
 
     @staticmethod
     def _extract_relevant_tensor_info(
         module: nn.Module,
         inputs: tuple[dict[str, tuple[torch.Tensor, torch.Tensor]], torch.Tensor],
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        pred_info, gt = inputs
-        all_anchors, all_objectness_probits, all_pred_deltas, _, _ = pred_info["rpn"]
-        gt_bounding_box = gt[..., 1:].squeeze(0)
+        prediction, ground_truth = inputs
+        all_anchors, all_objectness_probits, all_pred_deltas, _, _ = prediction["rpn"]
+        gt_bounding_box = ground_truth["gt_info"][
+            ...,
+            ObjectDetectionEnum.box_2d_left : ObjectDetectionEnum.box_2d_bottom + 1,
+        ].squeeze(0)
 
         return (
             all_anchors,
@@ -136,8 +142,9 @@ class RPNClassificationAndRegressionLoss(nn.Module):
 
 
 class RCNNCrossEntropyAndRegressionLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, name: str = "RCNNCrossEntropyAndRegressionLoss"):
         super().__init__()
+        self.name = name
         self.positives_ratio = 0.25
         self.negatives_ratio = 1 - self.positives_ratio
         self.iou_positive_threshold = 0.5
@@ -147,16 +154,23 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         self.regularization_factor = 10.0
         self.classification_loss_fn = nn.CrossEntropyLoss(reduction="mean")
         self.regression_loss_fn = nn.SmoothL1Loss(reduction="mean")
-        self.register_forward_pre_hook(self._extract_relevant_tensor_info)
+        self.register_forward_pre_hook(
+            RCNNCrossEntropyAndRegressionLoss._extract_relevant_tensor_info
+        )
 
     @staticmethod
     def _extract_relevant_tensor_info(
         module: nn.Module,
         inputs: tuple[dict[str, tuple[torch.Tensor, torch.Tensor]], torch.Tensor],
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        pred_info, gt = inputs
+        pred_info, ground_truth = inputs
         pred_class_logits, proposals, deltas = pred_info["faster-rcnn"]
-        gt_class, gt_bounding_boxes = gt[..., 0].squeeze(0), gt[..., 1:].squeeze(0)
+        gt_info = ground_truth["gt_info"][..., 1:].squeeze(0)
+        gt_class = gt_info[..., ObjectDetectionEnum.object_class]
+        gt_bounding_boxes = gt_info[
+            :,
+            ObjectDetectionEnum.box_2d_left : ObjectDetectionEnum.box_2d_bottom + 1,
+        ].squeeze(0)
 
         return pred_class_logits, proposals, deltas, gt_class, gt_bounding_boxes
 

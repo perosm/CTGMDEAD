@@ -4,6 +4,7 @@ from torch.utils.data.dataset import Dataset
 from torchvision import transforms
 from torch.utils.data import DataLoader
 import dataset.kitti.dataset_utils as KITTIutils
+from utils.shared.enums import TaskEnum
 
 
 class KittiDataset(Dataset):
@@ -172,13 +173,19 @@ class KittiDataset(Dataset):
             task_item[task] = self.task_transform[task](
                 self.load_functions[task](self.paths_dict[task][idx])
             )
-        if KITTIutils.TaskEnum.object_detection_3d in self.paths_dict.keys():
+        if (
+            TaskEnum.object_detection_3d or TaskEnum.object_detection_2d
+        ) in self.paths_dict.keys():
             frame_id = "/".join(
-                self.paths_dict[KITTIutils.TaskEnum.object_detection_3d][idx].parts[
+                self.paths_dict[TaskEnum.object_detection_3d][idx].parts[
                     self.UNIQUE_PATH_PARTS_NUMBER :
                 ]
             )
             projection_matrix = self.ground_truth_path_to_projection_matrices[frame_id]
-            task_item.update({"projection_matrix": projection_matrix})
+            gt = task_item[TaskEnum.object_detection_3d]
+            task_item[TaskEnum.object_detection_3d] = {
+                "gt_info": gt,
+                "projection_matrix": projection_matrix,
+            }
 
         return task_item

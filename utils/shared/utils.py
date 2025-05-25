@@ -30,16 +30,20 @@ from utils.object_detection.losses import (
     RPNClassificationAndRegressionLoss,
     RCNNCrossEntropyAndRegressionLoss,
 )
+from utils.object_detection_3d.losses import UncertaintyAwareRegressionLoss
 
 from utils.shared.prediction_postprocessor import PredictionPostprocessor
-from utils.object_detection.prediction_postprocessor import (
-    PredictionPostprocessor as ObjectDetection2DPredictionPostprocessor,
-)
 from utils.depth.prediction_postprocessor import (
     PredictionPostprocessor as DepthPredictionPostProcessor,
 )
 from utils.road_detection.prediction_postprocessor import (
     PredictionPostprocessor as RoadPredictionPostprocessor,
+)
+from utils.object_detection.prediction_postprocessor import (
+    PredictionPostprocessor as OD2DPredictionPostprocessor,
+)
+from utils.object_detection_3d.prediction_postprocessor import (
+    PredictionPostprocessor as OD3DPredictionPostprocessor,
 )
 from utils.depth.metrics import (
     MaskedAverageRelativeError,
@@ -253,11 +257,16 @@ def freeze_params(
 ############################## TRAIN UTILS ##############################
 def configure_loss(loss_configs: dict) -> MultiTaskLoss:
     loss_dict = {
+        # depth losses
         MaskedMAE.__name__: MaskedMAE,
         GradLoss.__name__: GradLoss,
+        # road detection losses
         BinaryCrossEntropyLoss.__name__: BinaryCrossEntropyLoss,
+        # object detection 2d losses
         RPNClassificationAndRegressionLoss.__name__: RPNClassificationAndRegressionLoss,
         RCNNCrossEntropyAndRegressionLoss.__name__: RCNNCrossEntropyAndRegressionLoss,
+        # object detection 3d losses
+        UncertaintyAwareRegressionLoss.__name__: UncertaintyAwareRegressionLoss,
     }
     task_losses = {task: [] for task in loss_configs.keys()}
     for task in loss_configs.keys():
@@ -280,7 +289,8 @@ def configure_prediction_postprocessor(tasks: list[str]):
     postprocess_functions = {
         TaskEnum.depth: DepthPredictionPostProcessor,
         TaskEnum.road_detection: RoadPredictionPostprocessor,
-        TaskEnum.object_detection_2d: ObjectDetection2DPredictionPostprocessor,
+        TaskEnum.object_detection_2d: OD2DPredictionPostprocessor,
+        TaskEnum.object_detection_3d: OD3DPredictionPostprocessor,
     }
     for task in tasks:
         per_task_postprocessing_funcs[task] = postprocess_functions[task]()
@@ -305,8 +315,9 @@ def configure_metrics(metric_configs):
         Recall.__name__: Recall,
         TrueNegativeRate.__name__: TrueNegativeRate,
         FalsePositiveRate.__name__: FalsePositiveRate,
-        # object detection metrics
+        # object detection 2D metrics
         mAP.__name__: mAP,
+        # object detection 3D metrics
     }
     task_metrics = {task: [] for task in metric_configs.keys()}
     for task in metric_configs.keys():
@@ -314,3 +325,16 @@ def configure_metrics(metric_configs):
             task_metrics[task].append(metrics_dict[metric_name]())
 
     return MultiTaskMetrics(task_metrics)
+
+
+############################## SHARED UTILS ##############################
+def move_data_to_gpu(data: dict[str, torch.Tensor | dict[str, torch.Tensor]]):
+    for task, value in data.items():
+        if isinstance(value, torch.Tensor):
+            data[task] = value.to(device="cuda")
+        elif isinstance(value, dict):
+            for subkey, subvalue in value.items():
+                if isinstance(subvalue, torch.Tensor):
+                    data[task][subkey] = subvalue.to("cuda")
+
+    return data

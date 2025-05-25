@@ -8,6 +8,7 @@ from dataset.kitti.dataset_utils import TaskEnum
 from utils.object_detection.utils import apply_deltas_to_boxes
 
 from utils.object_detection_3d.utils import project_3d_boxes_to_image
+from utils.shared.enums import ObjectDetectionEnum
 
 
 def plot_task_gt(task_ground_truth: dict[str, torch.Tensor]):
@@ -154,3 +155,61 @@ def plot_object_detection_predictions_2d(
     ax.imshow(input_image.permute(1, 2, 0))
     plt.tight_layout()
     plt.savefig(save_name)
+
+
+def plot_projected_height(data: dict[str, torch.Tensor]):
+    image = (
+        data[TaskEnum.input]
+        .squeeze(0)
+        .permute(1, 2, 0)
+        .detach()
+        .cpu()
+        .numpy()
+        .astype(np.uint8)
+        .copy()
+    )
+    ground_truth = data[TaskEnum.object_detection_3d]
+    gt_box_info = ground_truth["box_3d"].squeeze(0).detach()
+    projection_matrix = ground_truth["projection_matrix"].squeeze(0).detach()
+    # box_projected_2d = project_3d_boxes_to_image(gt_box_info, projection_matrix)
+    gt_H = gt_box_info[:, ObjectDetectionEnum.height]
+    gt_distance = gt_box_info[:, ObjectDetectionEnum.z]
+    focal_x = projection_matrix[1, 1]
+
+    h = focal_x * gt_H / gt_distance
+    object_center = gt_box_info[:, 4:7]
+    ones = torch.ones(object_center.shape[0]).unsqueeze(1)
+    object_center_homogeneous = torch.cat([object_center, ones], dim=1)
+    projected_object_center = (projection_matrix[:3] @ object_center_homogeneous.T).T
+    projected_object_center = (
+        projected_object_center / projected_object_center[:, 2][:, None]
+    )[:, :2]
+
+    top_points = projected_object_center.cpu().numpy().astype(np.int16)
+    bottom_points = top_points.copy().astype(np.int16)
+    bottom_points[:, 1] -= h.detach().cpu().numpy().astype(np.int16)
+    for bottom_point, top_point in zip(bottom_points, top_points):
+        cv2.line(
+            image,
+            (bottom_point[0], bottom_point[1]),
+            (top_point[0], top_point[1]),
+            color=(255, 0, 0),
+            thickness=2,
+        )
+    plt.imshow(image)
+    plt.show()
+
+
+def plot_od_3d_output(pred: dict[str, tuple[torch.Tensor]], data: dict):
+    image = (
+        data[TaskEnum.input]
+        .squeeze(0)
+        .permute(1, 2, 0)
+        .detach()
+        .cpu()
+        .numpy()
+        .astype(np.uint8)
+        .copy()
+    )
+
+    pred_object_info = pred[TaskEnum.object_detection_3d]

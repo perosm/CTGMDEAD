@@ -27,8 +27,9 @@ class MultiTaskLoss(nn.Module):
 
 
 class MaskedMAE(nn.Module):
-    def __init__(self, device="cuda"):
+    def __init__(self, name: str = "MaskedMAE", device: str = "cuda"):
         super().__init__()
+        self.name = name
         self._l1_loss = nn.L1Loss(reduction="none")
         self.device = device
 
@@ -40,8 +41,9 @@ class MaskedMAE(nn.Module):
 
 
 class GradLoss(nn.Module):
-    def __init__(self, device="cuda"):
+    def __init__(self, name: str = "GradLoss", device: str = "cuda"):
         super().__init__()
+        self.name = name
         sobel_x = (
             torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32)
             .unsqueeze(0)
@@ -74,10 +76,10 @@ class GradLoss(nn.Module):
 
 
 class BinaryCrossEntropyLoss(nn.Module):
-    def __init__(
-        self,
-    ):
+
+    def __init__(self, name: str = "BinaryCrossEntropyLoss"):
         super().__init__()
+        self.name = name
         self.loss = nn.BCELoss(reduction="mean")
 
     def forward(self, pred, gt):

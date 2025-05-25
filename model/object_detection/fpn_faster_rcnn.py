@@ -8,6 +8,7 @@ from model.object_detection_3d.distance_head import DistanceHead
 from model.object_detection_3d.attribute_head import AttributeHead
 from utils.shared.dict_utils import list_of_dict_to_dict
 from utils.object_detection.utils import apply_deltas_to_boxes
+from utils.shared.enums import TaskEnum
 
 
 class FPNFasterRCNNLinkerBlock(nn.Module):
@@ -269,6 +270,7 @@ class FPNFasterRCNN(nn.Module):
                     filtered_proposals,  # (num_proposals, 4)
                 ),
                 "faster-rcnn": (class_logits, filtered_proposals, proposal_deltas),
+                "distance_head": distance_head_output,  # (num_proposals, 4)
             }
 
         class_probits, pred_bounding_boxes, labels = (
@@ -284,4 +286,12 @@ class FPNFasterRCNN(nn.Module):
             class_probits=class_probits,
             labels=labels,
         )
-        return class_probits, pred_bounding_boxes, labels
+
+        return {
+            TaskEnum.object_detection_2d: (
+                class_probits,
+                pred_bounding_boxes,
+                labels,
+            ),
+            TaskEnum.object_detection_3d: (distance_head_output),
+        }

@@ -6,6 +6,7 @@ from tqdm import tqdm
 from utils.shared.visual_inspection import (
     plot_task_gt,
     plot_object_detection_predictions_2d,
+    plot_projected_height,
 )
 from utils.shared.aggregators.LossAggregator import LossAggregator
 from utils.shared.savers.LossSaver import LossSaver
@@ -20,6 +21,7 @@ from utils.shared.utils import (
     configure_optimizer,
     configure_loss,
     configure_logger,
+    move_data_to_gpu,
 )
 
 
@@ -49,8 +51,8 @@ def train(args: dict):
     data = next(iter(train_dataloader))
     for epoch in range(epochs):
         freeze_model(model, args["model"], False, epoch)
-        # for data in tqdm(train_dataloader, f"Epoch {epoch}"):
-        data = {task: data[task].to(device) for task in data.keys()}
+        # plot_projected_height(data)
+        data = move_data_to_gpu(data)
         # plot_task_gt(data)
         pred = model(data["input"])
         # pred = prediction_postprocessor(pred)
@@ -59,11 +61,11 @@ def train(args: dict):
         optimizer.step()
         optimizer.zero_grad()
         loss_aggregator.aggregate_per_batch(per_batch_task_losses)
-        # logger.log(
-        #     logging.INFO,
-        #     f"epoch: {epoch}; loss: {loss}, per_batch_task_losses: {per_batch_task_losses}",
-        # )
-        if epoch % 125 == 0 and epoch != 0:
+        logger.log(
+            logging.INFO,
+            f"epoch: {epoch}; loss: {loss}, per_batch_task_losses: {per_batch_task_losses}",
+        )
+        if epoch % 5 == 0 and epoch != 0:
             print(f"Epoch: {epoch}")
             eval.eval(args, model, epoch)
 

@@ -5,9 +5,9 @@ from torch import nn
 class DistanceHead(nn.Module):
     # channels:
     # - 0: H - regresses physical height
-    # - 1: sigma_H - regresses variables of uncertainty
+    # - 1: log_sigma_H - regresses variables of uncertainty
     # - 2: h_rec - regresses reciprocal of the projected physical height H
-    # - 3: sigma_h_rec - regresses variables of uncertainty
+    # - 3: log_sigma_h_rec - regresses variables of uncertainty
     out_features = 4
 
     def __init__(

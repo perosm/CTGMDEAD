@@ -36,6 +36,9 @@ class MultiTaskNetwork(nn.Module):
             module.train(mode)
 
         # Added
+        if not self.heads_and_necks:
+            return
+
         for task, module in self.heads_and_necks.items():
             module.train(mode)
 
