@@ -13,6 +13,7 @@ class DistanceHead(nn.Module):
     def __init__(
         self,
         num_conv_layers: int,
+        num_channels: int,
         num_fc_layers: int,
         rpn_output_channels: int,
         pool_output_size: tuple[int, int],
@@ -24,6 +25,7 @@ class DistanceHead(nn.Module):
 
         Args:
             num_conv_layers: Number of convolutional layers.
+            num_channels: Number of channels in the convolutional layers.
             num_fc_layers: Number of fully connected layers.
             rpn_output_channels: Number of channels outputed by the RPN module.
             pool_output_size: Height and width dimensions of the RoI.
@@ -31,6 +33,7 @@ class DistanceHead(nn.Module):
         """
         super().__init__()
         self.num_conv_layers = num_conv_layers
+        self.num_channels = num_channels
         self.num_fc_layers = num_fc_layers
         self.rpn_output_channels = rpn_output_channels
         self.pool_output_size = pool_output_size
@@ -38,13 +41,15 @@ class DistanceHead(nn.Module):
         self.convs = nn.ModuleList(
             nn.Sequential(
                 nn.Conv2d(
-                    in_channels=self.rpn_output_channels,
-                    out_channels=self.rpn_output_channels,
+                    in_channels=(
+                        self.rpn_output_channels if i == 0 else self.num_channels
+                    ),
+                    out_channels=self.num_channels,
                     kernel_size=3,
                     stride=1,
                     padding=1,
                 ),
-                nn.BatchNorm2d(num_features=self.rpn_output_channels),
+                nn.BatchNorm2d(num_features=self.num_channels),
                 nn.ReLU(inplace=True),
             )
             for i in range(self.num_conv_layers)
@@ -54,7 +59,7 @@ class DistanceHead(nn.Module):
             nn.Sequential(
                 nn.Linear(
                     in_features=(
-                        self.rpn_output_channels
+                        self.num_channels
                         * self.pool_output_size[0]
                         * self.pool_output_size[1]
                         if i == 0
@@ -83,9 +88,7 @@ class DistanceHead(nn.Module):
 
         return x
 
-    def forward(
-        self, pooled_proposals: torch.Tensor, proposals: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, pooled_proposals: torch.Tensor) -> torch.Tensor:
         return self.head(
             self._forward_fcs(
                 torch.flatten(self._forward_convs(pooled_proposals), start_dim=1)

@@ -80,7 +80,9 @@ class FPNFasterRCNN(nn.Module):
         self.distance_head = self._configure_distance_head(
             distance_head_config=configs["distance_head"]
         )
-        self.attribute_head = self._configure_attribute_head(attribute_head_config=None)
+        self.attribute_head = self._configure_attribute_head(
+            attribute_head_config=configs["attribute_head"]
+        )
 
     def _configure_linker_layer(
         self, num_channels_per_feature_map: list[int], out_channels: int
@@ -130,6 +132,7 @@ class FPNFasterRCNN(nn.Module):
         )
         return DistanceHead(
             num_conv_layers=distance_head_config["num_conv_layers"],
+            num_channels=distance_head_config["num_channels"],
             num_fc_layers=distance_head_config["num_fc_layers"],
             rpn_output_channels=self.out_channels,
             pool_output_size=self.pool_output_size,
@@ -139,7 +142,17 @@ class FPNFasterRCNN(nn.Module):
     def _configure_attribute_head(
         self, attribute_head_config: list[dict]
     ) -> AttributeHead:
-        pass
+        attribute_head_config = list_of_dict_to_dict(
+            list_of_dicts=attribute_head_config, new_dict={}, depth_cnt=1
+        )
+        return AttributeHead(
+            num_conv_layers=attribute_head_config["num_conv_layers"],
+            num_channels=attribute_head_config["num_channels"],
+            num_fc_layers=attribute_head_config["num_fc_layers"],
+            fc_features=attribute_head_config["fc_features"],
+            rpn_output_channels=self.out_channels,
+            pool_output_size=self.pool_output_size,
+        )
 
     def _fetch_probabilities_boxes_and_labels(
         self,
@@ -259,7 +272,8 @@ class FPNFasterRCNN(nn.Module):
             proposals=filtered_proposals,
         )
 
-        distance_head_output = self.distance_head(pooled_proposals, filtered_proposals)
+        distance_head_output = self.distance_head(pooled_proposals)
+        size, yaw, keypoints = self.attribute_head(pooled_proposals)
         if self.training:
             return {
                 "rpn": (
@@ -270,7 +284,12 @@ class FPNFasterRCNN(nn.Module):
                     filtered_proposals,  # (num_proposals, 4)
                 ),
                 "faster-rcnn": (class_logits, filtered_proposals, proposal_deltas),
-                "distance_head": distance_head_output,  # (num_proposals, 4)
+                "mono-rcnn": (
+                    distance_head_output,  # (num_proposals, 4)
+                    size,  # (num_proposals, 3)
+                    yaw,  # (num_proposals, 1)
+                    keypoints,  # (num_proposals, 10)
+                ),
             }
 
         class_probits, pred_bounding_boxes, labels = (
@@ -288,10 +307,10 @@ class FPNFasterRCNN(nn.Module):
         )
 
         return {
-            TaskEnum.object_detection_2d: (
+            "faster-rcnn": (
                 class_probits,
                 pred_bounding_boxes,
                 labels,
             ),
-            TaskEnum.object_detection_3d: (distance_head_output),
+            "mono-rcnn": (distance_head_output, size, yaw, keypoints),
         }

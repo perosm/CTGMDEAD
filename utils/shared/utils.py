@@ -30,7 +30,12 @@ from utils.object_detection.losses import (
     RPNClassificationAndRegressionLoss,
     RCNNCrossEntropyAndRegressionLoss,
 )
-from utils.object_detection_3d.losses import UncertaintyAwareRegressionLoss
+from utils.object_detection_3d.losses import (
+    UncertaintyAwareRegressionLoss,
+    L1SizeLoss,
+    L1YawLoss,
+    L1KeypointsLoss,
+)
 
 from utils.shared.prediction_postprocessor import PredictionPostprocessor
 from utils.depth.prediction_postprocessor import (
@@ -267,6 +272,9 @@ def configure_loss(loss_configs: dict) -> MultiTaskLoss:
         RCNNCrossEntropyAndRegressionLoss.__name__: RCNNCrossEntropyAndRegressionLoss,
         # object detection 3d losses
         UncertaintyAwareRegressionLoss.__name__: UncertaintyAwareRegressionLoss,
+        L1SizeLoss.__name__: L1SizeLoss,
+        L1YawLoss.__name__: L1YawLoss,
+        L1KeypointsLoss.__name__: L1KeypointsLoss,
     }
     task_losses = {task: [] for task in loss_configs.keys()}
     for task in loss_configs.keys():

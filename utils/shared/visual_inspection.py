@@ -200,16 +200,18 @@ def plot_projected_height(data: dict[str, torch.Tensor]):
     plt.show()
 
 
-def plot_od_3d_output(pred: dict[str, tuple[torch.Tensor]], data: dict):
-    image = (
-        data[TaskEnum.input]
-        .squeeze(0)
-        .permute(1, 2, 0)
-        .detach()
-        .cpu()
-        .numpy()
-        .astype(np.uint8)
-        .copy()
-    )
+# def plot_od_3d_output(pred: dict[str, tuple[torch.Tensor]], data: dict):
+#     image = (
+#         data[TaskEnum.input]
+#         .squeeze(0)
+#         .permute(1, 2, 0)
+#         .detach()
+#         .cpu()
+#         .numpy()
+#         .astype(np.uint8)
+#         .copy()
+#     )
 
-    pred_object_info = pred[TaskEnum.object_detection_3d]
+#     distance_head_output = pred[TaskEnum.object_detection_3d]["mono-rcnn"]
+#     projection_matrix = data[TaskEnum.object_detection_3d]["projection_matrix"]
+#     fx = projection_matrix[0, 0]

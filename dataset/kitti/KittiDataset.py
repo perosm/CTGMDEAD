@@ -33,7 +33,7 @@ class KittiDataset(Dataset):
         self.camera = camera
         self.camera_index = int(camera[-1])
         self._load_data_paths()
-        if KITTIutils.TaskEnum.object_detection_3d.name in self.task_paths.keys():
+        if TaskEnum.object_detection_3d in self.task_paths.keys():
             self._fetch_projection_matrices()
         self._filter_data_paths()
         self.load_functions = KITTIutils.load_utils(list(self.paths_dict.keys()))
@@ -48,13 +48,11 @@ class KittiDataset(Dataset):
     def _fetch_projection_matrices(self) -> None:
         delta_principal_point_x = (KITTIutils.KITTI_W - KITTIutils.NEW_W) / 2
         delta_principal_point_y = KITTIutils.KITTI_H - KITTIutils.NEW_H
-        if not self.paths_dict[KITTIutils.TaskEnum.object_detection_3d]:
+        if not self.paths_dict[TaskEnum.object_detection_3d]:
             return
 
         self.ground_truth_path_to_projection_matrices = {}
-        for ground_truth_objdet3d_path in self.paths_dict[
-            KITTIutils.TaskEnum.object_detection_3d
-        ]:
+        for ground_truth_objdet3d_path in self.paths_dict[TaskEnum.object_detection_3d]:
 
             calibrations_path = str(ground_truth_objdet3d_path).replace(
                 "ground_truth", "calibrations"
@@ -71,21 +69,15 @@ class KittiDataset(Dataset):
 
     def _read_projection_matrix(self, object_detection_calibration_path: pathlib.Path):
         with open(object_detection_calibration_path, "r") as file:
-            last_row = torch.Tensor([[0, 0, 0, 1]])
-            projection_matrix = torch.vstack(
-                (
-                    torch.Tensor(
-                        [
-                            float(number)
-                            for number in file.readlines()[self.camera_index]
-                            .split(": ")[1]
-                            .strip()
-                            .split()
-                        ]
-                    ).reshape(3, 4),
-                    last_row,
-                )
-            )
+            projection_matrix = torch.Tensor(
+                [
+                    float(number)
+                    for number in file.readlines()[self.camera_index]
+                    .split(": ")[1]
+                    .strip()
+                    .split()
+                ]
+            ).reshape(3, 4)
 
         return projection_matrix
 

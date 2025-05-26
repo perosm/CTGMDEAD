@@ -68,6 +68,12 @@ model:
         - top_k_boxes_testing: 2
       distance_head:
         - num_conv_layers: 2
+        - num_channels: 256
+        - num_fc_layers: 2
+        - fc_features: 1024
+      attribute_head:
+        - num_conv_layers: 2
+        - num_channels: 256
         - num_fc_layers: 2
         - fc_features: 1024
       
@@ -75,6 +81,9 @@ loss:
   object_detection_3d: 
     - RPNClassificationAndRegressionLoss
     - UncertaintyAwareRegressionLoss
+    - L1SizeLoss
+    - L1YawLoss
+    - L1KeypointsLoss
 
 optimizer:
   name: Adam

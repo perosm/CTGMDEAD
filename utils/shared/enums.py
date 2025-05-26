@@ -1,7 +1,18 @@
 import enum
 
 
-class TaskEnum(enum.StrEnum):
+class DirectValueMeta(enum.EnumMeta):
+    """https://muellerzr.github.io/blog/HackingTheEnum.html"""
+
+    def __getattribute__(cls, name):
+        value = super().__getattribute__(name)
+        if isinstance(value, cls):
+            value = value.value
+
+        return value
+
+
+class TaskEnum(enum.StrEnum, metaclass=DirectValueMeta):
     input = "input"
     depth = "depth"
     road_detection = "road_detection"
