@@ -2,6 +2,8 @@ import os
 import re
 import pathlib
 import logging
+from typing import Any
+from collections import defaultdict
 
 import torch
 from torch import nn
@@ -75,6 +77,9 @@ def prepare_save_directories(args: dict, subfolder_name="train") -> None:
         os.makedirs(save_dir)
 
     return save_dir
+
+
+from utils.shared.dict_utils import list_of_dict_to_dict
 
 
 ############################## CONFIG UTILS ##############################
@@ -292,7 +297,9 @@ def configure_optimizer(model: nn.Module, optimizer_configs: dict) -> Optimizer:
     )
 
 
-def configure_prediction_postprocessor(tasks: list[str]):
+def configure_eval_prediction_postprocessor(
+    task_postprocess_infos: list[dict[str, dict[str, Any] | None]],
+) -> None:
     per_task_postprocessing_funcs = {}
     postprocess_functions = {
         TaskEnum.depth: DepthPredictionPostProcessor,
@@ -300,8 +307,22 @@ def configure_prediction_postprocessor(tasks: list[str]):
         TaskEnum.object_detection_2d: OD2DPredictionPostprocessor,
         TaskEnum.object_detection_3d: OD3DPredictionPostprocessor,
     }
-    for task in tasks:
-        per_task_postprocessing_funcs[task] = postprocess_functions[task]()
+    merged_postprocess_info = defaultdict(dict)
+    for task_postprocess_info in task_postprocess_infos:
+        for task, postprocess_info in task_postprocess_info.items():
+            if postprocess_info:
+                postprocess_info_dict = list_of_dict_to_dict(postprocess_info, {}, 1)
+                merged_postprocess_info[task].update(postprocess_info_dict)
+            else:
+                # To ensure the key is inside the defaultdict
+                merged_postprocess_info[task]
+
+    for task, postprocess_info in merged_postprocess_info.items():
+        per_task_postprocessing_funcs[task] = (
+            postprocess_functions[task](**postprocess_info)
+            if postprocess_info
+            else postprocess_functions[task]()
+        )
 
     return PredictionPostprocessor(
         per_task_postprocessing_funcs=per_task_postprocessing_funcs

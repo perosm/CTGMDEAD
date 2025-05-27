@@ -1,12 +1,13 @@
 import torch
+from torch import nn
 
 
-class PredictionPostprocessor:
+class PredictionPostprocessor(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def __call__(
-        self, pred: dict[str, tuple[torch.Tensor, ...]]
-    ) -> dict[str, tuple[torch.Tensor, ...]]:
+    def forward(
+        self, prediction: torch.Tensor, projection_matrix: torch.Tensor
+    ) -> torch.Tensor:
 
-        return pred  # TODO: Should there be any postprocessing ?
+        return prediction  # TODO: Should there be any postprocessing ?

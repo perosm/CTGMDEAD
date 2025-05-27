@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import torch
 import matplotlib.pyplot as plt
+import pathlib
 from torchvision.utils import draw_bounding_boxes
 import dataset.kitti.dataset_utils as KITTIUtils
 from dataset.kitti.dataset_utils import TaskEnum
@@ -117,8 +118,8 @@ def draw_3d_bbox(image_3d_bboxes: np.ndarray, projected_points: np.ndarray):
         (3, 7),
     ]
     for start, end in edges:
-        start_point = projected_points[start]
-        end_point = projected_points[end]
+        start_point = projected_points[:, start]
+        end_point = projected_points[:, end]
         cv2.line(
             image_3d_bboxes, start_point, end_point, color=(255, 0, 0), thickness=1
         )
@@ -200,18 +201,23 @@ def plot_projected_height(data: dict[str, torch.Tensor]):
     plt.show()
 
 
-# def plot_od_3d_output(pred: dict[str, tuple[torch.Tensor]], data: dict):
-#     image = (
-#         data[TaskEnum.input]
-#         .squeeze(0)
-#         .permute(1, 2, 0)
-#         .detach()
-#         .cpu()
-#         .numpy()
-#         .astype(np.uint8)
-#         .copy()
-#     )
+def plot_od_3d_output(
+    image: torch.Tensor,
+    pred: torch.Tensor,
+    projection_matrix: torch.Tensor,
+    save_path: pathlib.Path,
+):
+    image = (
+        image.squeeze(0).permute(1, 2, 0).detach().cpu().numpy().astype(np.uint8).copy()
+    )
+    projection_matrix = projection_matrix.squeeze(0)
+    projected_3d_boxes = project_3d_boxes_to_image(
+        boxes_3d_info=pred, projection_matrix=projection_matrix
+    )
 
-#     distance_head_output = pred[TaskEnum.object_detection_3d]["mono-rcnn"]
-#     projection_matrix = data[TaskEnum.object_detection_3d]["projection_matrix"]
-#     fx = projection_matrix[0, 0]
+    projected_3d_boxes = projected_3d_boxes.detach().cpu().numpy().astype(np.uint16)
+    for projected_3d_box in projected_3d_boxes:
+        draw_3d_bbox(image_3d_bboxes=image, projected_points=projected_3d_box)
+
+    plt.imshow(image)
+    plt.savefig(save_path)

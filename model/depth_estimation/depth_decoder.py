@@ -58,8 +58,11 @@ class UnetDepthDecoder(nn.Module):
             in_channels // channel_scale_factors[2],
             in_channels // channel_scale_factors[3],
         )
-        self.conv = nn.Conv2d(
-            in_channels // channel_scale_factors[3], out_channels, kernel_size=1
+        self.conv = nn.Sequential(
+            nn.Conv2d(
+                in_channels // channel_scale_factors[3], out_channels, kernel_size=1
+            ),
+            nn.ReLU(inplace=True),
         )
 
     def forward(

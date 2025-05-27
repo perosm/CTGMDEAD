@@ -288,7 +288,7 @@ class FPNFasterRCNN(nn.Module):
                     distance_head_output,  # (num_proposals, 4)
                     size,  # (num_proposals, 3)
                     yaw,  # (num_proposals, 1)
-                    keypoints,  # (num_proposals, 10)
+                    keypoints,  # (num_proposals, 9)
                 ),
             }
 
@@ -307,6 +307,7 @@ class FPNFasterRCNN(nn.Module):
         )
 
         return {
+            "rpn": (filtered_proposals),
             "faster-rcnn": (
                 class_probits,
                 pred_bounding_boxes,

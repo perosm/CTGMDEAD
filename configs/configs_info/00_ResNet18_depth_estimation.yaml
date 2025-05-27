@@ -27,6 +27,11 @@ eval:
     shuffle: False
     num_workers: 1
 
+prediction_postprocess: # used only in eval
+  - depth_estimation:
+    - min_depth: 0.0
+    - max_depth: 90.0
+
 model:
   encoder:
     name: ResNet18

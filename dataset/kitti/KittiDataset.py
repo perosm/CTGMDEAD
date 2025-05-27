@@ -6,8 +6,12 @@ from torch.utils.data import DataLoader
 import dataset.kitti.dataset_utils as KITTIutils
 from utils.shared.enums import TaskEnum
 
+DELTA_PRINCIPAL_POINT_X = (KITTIutils.KITTI_W - KITTIutils.NEW_W) / 2
+DELTA_PRINCIPAL_POINT_Y = KITTIutils.KITTI_H - KITTIutils.NEW_H
+
 
 class KittiDataset(Dataset):
+    DATE_INDEX = -5
     UNIQUE_PATH_PARTS_NUMBER = -5
 
     def __init__(
@@ -23,6 +27,7 @@ class KittiDataset(Dataset):
           - paths: paths to input data and ground truth for neural networks tasks (e.g. object detection, depth estimation...)
                    paired with the path to the folder where the ground truth for each of the tasks is stored.
         """
+        self.ground_truth_path_to_projection_matrices = {}
         self.task_transform = self._configure_transforms(
             KITTIutils.task_tranform_mapping(task_transform)
         )
@@ -46,12 +51,9 @@ class KittiDataset(Dataset):
         }
 
     def _fetch_projection_matrices(self) -> None:
-        delta_principal_point_x = (KITTIutils.KITTI_W - KITTIutils.NEW_W) / 2
-        delta_principal_point_y = KITTIutils.KITTI_H - KITTIutils.NEW_H
         if not self.paths_dict[TaskEnum.object_detection_3d]:
             return
 
-        self.ground_truth_path_to_projection_matrices = {}
         for ground_truth_objdet3d_path in self.paths_dict[TaskEnum.object_detection_3d]:
 
             calibrations_path = str(ground_truth_objdet3d_path).replace(
@@ -63,8 +65,6 @@ class KittiDataset(Dataset):
                 ]
             )
             projection_matrix = self._read_projection_matrix(calibrations_path)
-            projection_matrix[0, 2] -= delta_principal_point_x
-            projection_matrix[1, 2] -= delta_principal_point_y
             self.ground_truth_path_to_projection_matrices[frame_id] = projection_matrix
 
     def _read_projection_matrix(self, object_detection_calibration_path: pathlib.Path):
@@ -78,10 +78,12 @@ class KittiDataset(Dataset):
                     .split()
                 ]
             ).reshape(3, 4)
+            projection_matrix[0, 2] -= DELTA_PRINCIPAL_POINT_X
+            projection_matrix[1, 2] -= DELTA_PRINCIPAL_POINT_Y
 
         return projection_matrix
 
-    def load_projection_matrix(self, frame: str) -> torch.Tensor:
+    def load_projection_matrix(self, frame: pathlib.Path) -> torch.Tensor:
         """
         Based on the given frame loads a projection matrix.
 
@@ -98,13 +100,34 @@ class KittiDataset(Dataset):
             Projection matrix for a frame.
         """
         projection_matrix = self.ground_truth_path_to_projection_matrices.get(
-            frame, None
+            str(frame), None
         )
-        if projection_matrix:
+        if projection_matrix is not None:
             return projection_matrix
 
-        # TODO: fetch closest projection matrix to that frame
-        return
+        projection_matrix_by_date = frame.absolute() / "calib_cam_to_cam.txt"
+        return self._read_projection_matrix_by_date(projection_matrix_by_date)
+
+    def _read_projection_matrix_by_date(
+        self, calibration_path: pathlib.Path
+    ) -> torch.Tensor:
+        info_dict = {}
+        with open(calibration_path, "r") as file:
+            lines = file.readlines()
+            for line in lines:
+                k, value = line.split(": ")
+                info_dict[k] = value
+
+        projection_matrix = torch.Tensor(
+            [
+                float(num)
+                for num in info_dict[f"P_rect_0{self.camera_index}"].strip().split()
+            ]
+        ).reshape(3, 4)
+        projection_matrix[0, 2] -= DELTA_PRINCIPAL_POINT_X
+        projection_matrix[1, 2] -= DELTA_PRINCIPAL_POINT_Y
+
+        return projection_matrix
 
     def _load_data_paths(self) -> None:
         for task in self.task_paths.keys():
@@ -160,6 +183,9 @@ class KittiDataset(Dataset):
         return self.length
 
     def __getitem__(self, idx):
+        frame_id = pathlib.Path(
+            *self.paths_dict[TaskEnum.input][idx].parts[: self.DATE_INDEX + 1]
+        )
         task_item = dict.fromkeys(self.paths_dict.keys())
         for task in self.paths_dict.keys():
             task_item[task] = self.task_transform[task](
@@ -168,16 +194,20 @@ class KittiDataset(Dataset):
         if (
             TaskEnum.object_detection_3d or TaskEnum.object_detection_2d
         ) in self.paths_dict.keys():
-            frame_id = "/".join(
-                self.paths_dict[TaskEnum.object_detection_3d][idx].parts[
+            frame_id = pathlib.Path(
+                *self.paths_dict[TaskEnum.object_detection_3d][idx].parts[
                     self.UNIQUE_PATH_PARTS_NUMBER :
                 ]
             )
-            projection_matrix = self.ground_truth_path_to_projection_matrices[frame_id]
+            projection_matrix = self.load_projection_matrix(frame=frame_id)
             gt = task_item[TaskEnum.object_detection_3d]
             task_item[TaskEnum.object_detection_3d] = {
                 "gt_info": gt,
                 "projection_matrix": projection_matrix,
             }
+
+        # Always loads projection matrix which will be used for prediction postprocess
+        # and for visualizing OD predictions on non OD related frames
+        task_item["projection_matrix"] = self.load_projection_matrix(frame=frame_id)
 
         return task_item

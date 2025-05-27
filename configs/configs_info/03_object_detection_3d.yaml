@@ -25,6 +25,12 @@ eval:
     shuffle: False
     num_workers: 1
 
+prediction_postprocess: # used only in eval
+  - object_detection_3d: # None
+  - depth:
+    - min_depth: 0.0
+    - max_depth: 90.0
+
 model:
   encoder:
     name: ResNet18
@@ -89,10 +95,10 @@ optimizer:
   name: Adam
   lr: 1e-6
 
-epochs: 10
+epochs: 10000
 
 metrics:
   object_detection_3d:
-    - mAP
+    # - mAP
 
 save_path: ../run_info/
