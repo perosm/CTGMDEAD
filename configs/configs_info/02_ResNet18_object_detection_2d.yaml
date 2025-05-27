@@ -1,5 +1,4 @@
 device: cuda
-tasks: ["object_detection_2d"] # for configuring prediction postprocess
 dataset:
   dataset_name: KittiDataset
   task_transform:
@@ -8,7 +7,7 @@ dataset:
     object_detection_2d:
   task_paths:
     input: "./data/kitti/input"
-    object_detection_2d: "./data/kitti/object_detection_3d/ground_truth"
+    object_detection_2d: "./data/kitti/object_detection/ground_truth"
 
 train:
   dataloader:

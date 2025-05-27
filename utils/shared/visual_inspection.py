@@ -221,3 +221,4 @@ def plot_od_3d_output(
 
     plt.imshow(image)
     plt.savefig(save_path)
+    plt.close()

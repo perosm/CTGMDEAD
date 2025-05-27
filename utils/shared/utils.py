@@ -179,20 +179,12 @@ def _configure_decoder(decoder_configs: dict) -> nn.Module:
 def _configure_necks_and_heads(
     necks_and_heads_configs: dict, device: torch.device
 ) -> nn.Module:
-    necks_and_heads = {}
     necks_and_heads_dict = {FPNFasterRCNN.__name__: FPNFasterRCNN}
 
     if not necks_and_heads_configs:
         return None
 
-    for task in necks_and_heads_configs.keys():
-        necks_and_heads_info = necks_and_heads_configs[task]
-        name = necks_and_heads_info.pop("name")
-        necks_and_heads[task] = necks_and_heads_dict[name](
-            necks_and_heads_configs[task]
-        ).to(device)
-
-    return necks_and_heads
+    return FPNFasterRCNN(necks_and_heads_configs)
 
 
 def print_model_size(model: nn.Module) -> None:
@@ -216,20 +208,43 @@ def print_model_size(model: nn.Module) -> None:
     print(f"model size: {size_in_mb:.3f}MB")
 
 
-def freeze_model(
-    model: MultiTaskNetwork, model_configs: dict, freeze: bool, epoch: int = 0
-) -> None:
-    command = "freeze_epoch" if freeze else "unfreeze_epoch"
-    if model_configs["encoder"][command] == epoch:
-        freeze_params(model.encoder, freeze)
+def freeze_model(model: MultiTaskNetwork, model_configs: dict, epoch: int = 0) -> None:
+    submodules_dict = {
+        "encoder": model.encoder,
+        "depth_decoder": model.depth_decoder,
+        "road_detection_decoder": getattr(model, "road_detection_decoder", None),
+    }
 
-    if model_configs["depth_decoder"][command] == epoch:
-        freeze_params(model.depth_decoder, freeze)
+    for submodule_name, submodule in submodules_dict.items():
+        submodule_config = list_of_dict_to_dict(
+            model_configs.get(submodule_name, {}), {}, 1
+        )
+        if submodule:
+            if submodule_config.get("freeze_epoch") == epoch:
+                freeze_params(submodule, freeze=True)
+            if submodule_config.get("unfreeze_epoch") == epoch:
+                freeze_params(submodule, freeze=False)
 
-    road_detection_decoder_configs = model_configs.get("road_detection_decoder", None)
-    if road_detection_decoder_configs:
-        if road_detection_decoder_configs[command] == epoch:
-            freeze_params(model.road_detection_decoder, freeze)
+    heads_and_necks_config = model_configs.get("necks_and_heads", {})
+    heads_and_necks = getattr(model, "heads_and_necks", None)
+
+    if heads_and_necks and heads_and_necks_config:
+        for submodule_name in [
+            "rpn",
+            "roi",
+            "output_heads",
+            "distance_head",
+            "attribute_head",
+        ]:
+            submodule = getattr(heads_and_necks, submodule_name, None)
+            submodule_config = list_of_dict_to_dict(
+                heads_and_necks_config.get(submodule_name, {})
+            )
+            if submodule:
+                if submodule_config.get("freeze_epoch") == epoch:
+                    freeze_params(submodule, freeze=True)
+                if submodule_config.get("unfreeze_epoch") == epoch:
+                    freeze_params(submodule, freeze=False)
 
 
 def freeze_params(
@@ -240,15 +255,16 @@ def freeze_params(
     By default we all layers are frozen.
 
     Args:
-     - model (nn.Module): model whose layers are to be freezed
-     - freeze (bool): freeze flag. If true freezes given layers. If false unfreezes given layers.
-     - layers (Dict[str, List[str]]): dictionary whose keys represent top level building blocks
-                                      and whose values represent lower level components such as
-                                      convolutions, batchnorm etc...
+     - model: Module whose layers are to be freezed or unfreezed.
+     - freeze: If True freezes given layers. If False unfreezes given layers.
+     - layers: Dictionary whose keys represent top level building blocks
+               and whose values represent lower level components such as
+               convolutions, batchnorm etc...
 
     Returns:
-     - model (nn.Module): model with frozen/unfrozen layers.
+     - model: Module with frozen/unfrozen layers.
     """
+    print(f"Module: {model._get_name()}")
     pattern = None
     for layer_name, sublayer_names in layers.items():
         layer_pattern = re.sub(r"\*", r".*", layer_name)
@@ -260,7 +276,7 @@ def freeze_params(
                 pattern = f"{layer_pattern}.*{sublayer_pattern}"
             for name, param in model.named_parameters():
                 if re.search(pattern, name, re.DOTALL):
-                    print(f"{name}" + (" frozen!" if freeze else " unfrozen!"))
+                    print(f"\t{name}" + (" frozen!" if freeze else " unfrozen!"))
                     param.requires_grad = False if freeze else True
 
 

@@ -1,5 +1,6 @@
-from tqdm import tqdm
+import torch
 from torch import nn
+from tqdm import tqdm
 
 from utils.shared.utils import (
     configure_dataset,
@@ -39,28 +40,30 @@ def eval(args: dict, model: nn.Module, epoch: int | None):
     # )
 
     model.eval()
-    data = next(iter(eval_dataloader))
-    # for data in tqdm(eval_dataloader, f"Epoch {epoch}"):
-    data = move_data_to_gpu(data)
-    pred = model(data["input"])
-    pred = prediction_postprocessor(pred, data["projection_matrix"])
-    images_dir = save_dir / "images"
-    images_dir.mkdir(parents=True, exist_ok=True)
-    # plot_object_detection_predictions_2d(
-    #     data["input"],
-    #     pred["object_detection_2d"],
-    #     data["object_detection_2d"],
-    #     images_dir / f"{epoch}.png",
-    # )
-    plot_od_3d_output(
-        image=data["input"],
-        pred=pred["object_detection_3d"],
-        projection_matrix=data["projection_matrix"],
-        save_path=images_dir / f"OD3D_{epoch}.png",
-    )
+    with torch.no_grad():
+        data = next(iter(eval_dataloader))
+        # for data in tqdm(eval_dataloader, f"Epoch {epoch}"):
+        data = move_data_to_gpu(data)
+        pred = model(data["input"])
+        pred = prediction_postprocessor(pred, data["projection_matrix"])
+        images_dir = save_dir / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+        # plot_object_detection_predictions_2d(
+        #     data["input"],
+        #     pred["object_detection_2d"],
+        #     data["object_detection_2d"],
+        #     images_dir / f"{epoch}.png",
+        # )
+        plot_od_3d_output(
+            image=data["input"],
+            pred=pred["object_detection_3d"],
+            projection_matrix=data["projection_matrix"],
+            save_path=images_dir / f"OD3D_{epoch}.png",
+        )
 
-    # per_batch_task_metrics = metrics(pred, data)
-    # metrics_aggregator.aggregate_per_batch(per_batch_task_metrics)
+        # per_batch_task_metrics = metrics(pred, data)
+        # metrics_aggregator.aggregate_per_batch(per_batch_task_metrics)
 
-    # metrics_saver.save()
-    model.train()
+        # metrics_saver.save()
+
+    return

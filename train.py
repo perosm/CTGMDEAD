@@ -41,7 +41,6 @@ def train(args: dict):
     losses = configure_loss(args["loss"])
     optimizer = configure_optimizer(model, args["optimizer"])
     epochs = args["epochs"]
-    freeze_model(model, args["model"], True, 0)
     model.train()
     loss_aggregator = LossAggregator(
         task_losses=losses.task_losses, epochs=epochs, num_batches=1, device=device
@@ -50,7 +49,7 @@ def train(args: dict):
 
     data = next(iter(train_dataloader))
     for epoch in range(epochs):
-        freeze_model(model, args["model"], False, epoch)
+        freeze_model(model, args["model"], epoch)
         # plot_projected_height(data)
         data = move_data_to_gpu(data)
         # plot_task_gt(data)
@@ -67,6 +66,7 @@ def train(args: dict):
         if epoch % 100 == 0 and epoch != 0:
             print(f"Epoch: {epoch}")
             eval.eval(args, model, epoch)
+            model.train()
 
     loss_saver.save_plot()
     torch.save(model.state_dict(), save_dir / "model.pth")
