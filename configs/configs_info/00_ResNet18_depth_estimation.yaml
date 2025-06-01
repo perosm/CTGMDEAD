@@ -28,7 +28,7 @@ eval:
     num_workers: 1
 
 prediction_postprocess: # used only in eval
-  - depth_estimation:
+  - depth:
     - min_depth: 0.0
     - max_depth: 90.0
 
@@ -62,4 +62,4 @@ metrics:
   depth:
     - MaskedMAE
 
-save_path: ~/faks/output/
+save_path: ../run_info/

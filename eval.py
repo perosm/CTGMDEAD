@@ -10,6 +10,7 @@ from utils.shared.utils import (
     configure_eval_prediction_postprocessor,
     prepare_save_directories,
     move_data_to_gpu,
+    configure_visualizers,
 )
 from utils.shared.visual_inspection import (
     plot_object_detection_predictions_2d,
@@ -38,6 +39,7 @@ def eval(args: dict, model: nn.Module, epoch: int | None):
     #     save_dir=save_dir,
     #     name=f"metrics{epoch}" if epoch else "metrics",
     # )
+    visualizers = configure_visualizers(args, save_dir, epoch)
 
     model.eval()
     with torch.no_grad():
@@ -46,20 +48,7 @@ def eval(args: dict, model: nn.Module, epoch: int | None):
         data = move_data_to_gpu(data)
         pred = model(data["input"])
         pred = prediction_postprocessor(pred, data["projection_matrix"])
-        images_dir = save_dir / "images"
-        images_dir.mkdir(parents=True, exist_ok=True)
-        # plot_object_detection_predictions_2d(
-        #     data["input"],
-        #     pred["object_detection_2d"],
-        #     data["object_detection_2d"],
-        #     images_dir / f"{epoch}.png",
-        # )
-        plot_od_3d_output(
-            image=data["input"],
-            pred=pred["object_detection_3d"],
-            projection_matrix=data["projection_matrix"],
-            save_path=images_dir / f"OD3D_{epoch}.png",
-        )
+        visualizers.plot_visualizations(pred=pred, gt=data, image=data["input"])
 
         # per_batch_task_metrics = metrics(pred, data)
         # metrics_aggregator.aggregate_per_batch(per_batch_task_metrics)

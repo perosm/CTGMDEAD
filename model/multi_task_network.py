@@ -33,8 +33,6 @@ class MultiTaskNetwork(nn.Module):
             )
 
         if self.heads_and_necks:
-            task_outputs[TaskEnum.object_detection_3d] = self.heads_and_necks(
-                fpn_outputs
-            )
+            task_outputs[TaskEnum.object_detection] = self.heads_and_necks(fpn_outputs)
 
         return task_outputs

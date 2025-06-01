@@ -4,10 +4,10 @@ dataset:
   task_transform:
     input: 
       - Crop
-    object_detection_3d:
+    object_detection:
   task_paths:
     input: "./data/kitti/input"
-    object_detection_3d: "./data/kitti/object_detection/ground_truth"
+    object_detection: "./data/kitti/object_detection/ground_truth"
 
 train:
   dataloader:
@@ -24,12 +24,6 @@ eval:
     batch_size: 1
     shuffle: False
     num_workers: 1
-
-prediction_postprocess: # used only in eval
-  - object_detection_3d: # None
-  - depth:
-    - min_depth: 0.0
-    - max_depth: 90.0
 
 model:
   encoder:
@@ -52,12 +46,13 @@ model:
     out_channels: 256
     probability_threshold: 0.1
     iou_threshold: 0.5
+    num_classes: 4 # number of classes we are trying to predict + background
     rpn:
       - freeze_epoch: -1
       - unfreeze_epoch: 0
       - objectness_threshold: 0.5
       - iou_threshold: 0.7
-      - pre_nms_filtering: 4000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
+      - pre_nms_filtering: 6000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
       - top_k_proposals_training: 64 # per fpn layer
       - top_k_proposals_testing: 8 # per fpn layer
       - anchor_generator:
@@ -73,28 +68,34 @@ model:
     output_heads:
       - freeze_epoch: 0
       - unfreeze_epoch: 200
-      - num_classes: 4 # number of classes we are trying to predict + background
       - score_threshold: 0.3
       - top_k_boxes_training: 256
       - top_k_boxes_testing: 2
     distance_head:
       - freeze_epoch: 0
       - unfreeze_epoch: 200
-      - num_conv_layers: 2
+      - num_conv_layers: 1
       - num_channels: 256
       - num_fc_layers: 2
       - fc_features: 1024
     attribute_head:
       - freeze_epoch: 0
       - unfreeze_epoch: 200
-      - num_conv_layers: 2
+      - num_conv_layers: 1
       - num_channels: 256
       - num_fc_layers: 2
       - fc_features: 1024
-      
+
+prediction_postprocess: # used only in eval
+  - depth:
+    - min_depth: 0.0
+    - max_depth: 90.0
+  - object_detection: # None
+ 
 loss:
-  object_detection_3d: 
+  object_detection: 
     - RPNClassificationAndRegressionLoss
+    - RCNNCrossEntropyAndRegressionLoss
     - UncertaintyAwareRegressionLoss
     - L1SizeLoss
     - L1YawLoss
@@ -102,12 +103,12 @@ loss:
 
 optimizer:
   name: Adam
-  lr: 1e-6
+  lr: 1e-5
 
 epochs: 1000
 
 metrics:
-  object_detection_3d:
+  object_detection:
     # - mAP
 
 save_path: ../run_info/

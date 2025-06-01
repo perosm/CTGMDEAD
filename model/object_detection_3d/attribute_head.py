@@ -16,6 +16,7 @@ class AttributeHead(nn.Module):
         rpn_output_channels: int,
         pool_output_size: tuple[int, int],
         fc_features: int,
+        num_classes: int,
     ):
         """
         Three dimensional attribute head is used to predict:
@@ -51,6 +52,8 @@ class AttributeHead(nn.Module):
         self.rpn_output_channels = rpn_output_channels
         self.pool_output_size = pool_output_size
         self.fc_features = fc_features
+        self.num_classes = num_classes
+
         self.convs = nn.ModuleList(
             nn.Sequential(
                 nn.Conv2d(
@@ -85,21 +88,17 @@ class AttributeHead(nn.Module):
             for i in range(self.num_fc_layers)
         )
 
-        self.size_head = nn.Sequential(
-            nn.Linear(
-                in_features=self.fc_features, out_features=self.size_head_out_features
-            ),
-            nn.ReLU(inplace=True),
+        self.size_head = nn.Linear(
+            in_features=self.fc_features, out_features=self.size_head_out_features
         )
+
         self.yaw_head = nn.Linear(
             in_features=self.fc_features, out_features=self.yaw_head_out_features
         )
-        self.keypoints_head = nn.Sequential(
-            nn.Linear(
-                in_features=self.fc_features,
-                out_features=self.keypoints_head_out_features,
-            ),
-            nn.ReLU(inplace=True),
+
+        self.keypoints_head = nn.Linear(
+            in_features=self.fc_features,
+            out_features=self.keypoints_head_out_features,
         )
 
     def _forward_convs(self, x: torch.Tensor) -> torch.Tensor:

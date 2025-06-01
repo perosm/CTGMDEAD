@@ -63,7 +63,7 @@ def train(args: dict):
             logging.INFO,
             f"epoch: {epoch}; loss: {loss}, per_batch_task_losses: {per_batch_task_losses}",
         )
-        if epoch % 100 == 0 and epoch != 0:
+        if epoch % 5 == 0 and epoch != 0:
             print(f"Epoch: {epoch}")
             eval.eval(args, model, epoch)
             model.train()

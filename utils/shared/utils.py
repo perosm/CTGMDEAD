@@ -47,10 +47,7 @@ from utils.road_detection.prediction_postprocessor import (
     PredictionPostprocessor as RoadPredictionPostprocessor,
 )
 from utils.object_detection.prediction_postprocessor import (
-    PredictionPostprocessor as OD2DPredictionPostprocessor,
-)
-from utils.object_detection_3d.prediction_postprocessor import (
-    PredictionPostprocessor as OD3DPredictionPostprocessor,
+    PredictionPostprocessor as ObjectDetectionDPredictionPostprocessor,
 )
 from utils.depth.metrics import (
     MaskedAverageRelativeError,
@@ -67,6 +64,10 @@ from utils.road_detection.metrics import (
     TrueNegativeRate,
 )
 from utils.object_detection.metrics import mAP
+from utils.shared.visualizer import Visualizer
+from utils.object_detection.visualizer import Visualizer as ObjectDetectionVisualizer
+from utils.depth.visualizer import Visualizer as DepthVisualizer
+from utils.road_detection.visualizer import Visualizer as RoadVisualizer
 
 
 def prepare_save_directories(args: dict, subfolder_name="train") -> None:
@@ -315,13 +316,12 @@ def configure_optimizer(model: nn.Module, optimizer_configs: dict) -> Optimizer:
 
 def configure_eval_prediction_postprocessor(
     task_postprocess_infos: list[dict[str, dict[str, Any] | None]],
-) -> None:
+) -> PredictionPostprocessor:
     per_task_postprocessing_funcs = {}
     postprocess_functions = {
         TaskEnum.depth: DepthPredictionPostProcessor,
         TaskEnum.road_detection: RoadPredictionPostprocessor,
-        TaskEnum.object_detection_2d: OD2DPredictionPostprocessor,
-        TaskEnum.object_detection_3d: OD3DPredictionPostprocessor,
+        TaskEnum.object_detection: ObjectDetectionDPredictionPostprocessor,
     }
     merged_postprocess_info = defaultdict(dict)
     for task_postprocess_info in task_postprocess_infos:
@@ -370,6 +370,29 @@ def configure_metrics(metric_configs):
             task_metrics[task].append(metrics_dict[metric_name]())
 
     return MultiTaskMetrics(task_metrics)
+
+
+def configure_visualizers(
+    configs: dict, save_dir: pathlib.Path, epoch: int
+) -> Visualizer:
+    visualizer_configs = configs["dataset"]["task_paths"]
+    save_path = save_dir / "images"
+
+    visualizers_dict = {
+        ObjectDetectionVisualizer.task: ObjectDetectionVisualizer,
+        DepthVisualizer.task: DepthVisualizer,
+        RoadVisualizer.task: RoadVisualizer,
+    }
+
+    return Visualizer(
+        {
+            task: visualizers_dict[task]()
+            for task in visualizer_configs.keys()
+            if task in visualizers_dict
+        },
+        save_dir=save_path,
+        epoch=epoch,
+    )
 
 
 ############################## SHARED UTILS ##############################

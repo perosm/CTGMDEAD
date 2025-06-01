@@ -63,6 +63,7 @@ class FPNFasterRCNN(nn.Module):
         self.out_channels = configs["out_channels"]
         self.probability_threshold = configs["probability_threshold"]
         self.iou_threshold = configs["iou_threshold"]
+        self.num_classes = configs["num_classes"]
         self.linker_layer = self._configure_linker_layer(
             num_channels_per_feature_map=self.num_channels_per_feature_map,
             out_channels=self.out_channels,
@@ -121,7 +122,7 @@ class FPNFasterRCNN(nn.Module):
         return OutputHeads(
             image_size=self.image_size,
             pool_size=self.pool_output_size,
-            num_classes=output_heads_config["num_classes"],
+            num_classes=self.num_classes,
         )
 
     def _configure_distance_head(
@@ -152,6 +153,7 @@ class FPNFasterRCNN(nn.Module):
             fc_features=attribute_head_config["fc_features"],
             rpn_output_channels=self.out_channels,
             pool_output_size=self.pool_output_size,
+            num_classes=self.num_classes,
         )
 
     def _fetch_probabilities_boxes_and_labels(
@@ -272,9 +274,10 @@ class FPNFasterRCNN(nn.Module):
             proposals=filtered_proposals,
         )
 
-        distance_head_output = self.distance_head(pooled_proposals)
-        size, yaw, keypoints = self.attribute_head(pooled_proposals)
         if self.training:
+            distance_head_output = self.distance_head(pooled_proposals)
+            size, yaw, keypoints = self.attribute_head(pooled_proposals)
+
             return {
                 "rpn": (
                     all_anchors,  # (num_anchors, 4)
@@ -291,7 +294,6 @@ class FPNFasterRCNN(nn.Module):
                     keypoints,  # (num_proposals, 9)
                 ),
             }
-
         class_probits, pred_bounding_boxes, labels = (
             self._fetch_probabilities_boxes_and_labels(
                 proposals=filtered_proposals,
@@ -299,12 +301,18 @@ class FPNFasterRCNN(nn.Module):
                 class_logits=class_logits,
             )
         )
-
         class_probits, pred_bounding_boxes, labels = self._filter_boxes(
             bounding_boxes=pred_bounding_boxes,
             class_probits=class_probits,
             labels=labels,
         )
+
+        pooled_boxes = self.roi(
+            fpn_feature_map_outputs=fpn_outputs,
+            proposals=pred_bounding_boxes,
+        )
+        distance_head_output = self.distance_head(pooled_boxes)
+        size, yaw, keypoints = self.attribute_head(pooled_boxes)
 
         return {
             "rpn": (filtered_proposals),

@@ -4,10 +4,10 @@ dataset:
   task_transform:
     input: 
       - Crop
-    object_detection_2d:
+    object_detection:
   task_paths:
     input: "./data/kitti/input"
-    object_detection_2d: "./data/kitti/object_detection/ground_truth"
+    object_detection: "./data/kitti/object_detection/ground_truth"
 
 train:
   dataloader:
@@ -30,55 +30,81 @@ model:
     name: ResNet18
     pretrained: True
     freeze_epoch: -1
-    unfreeze_epoch: -1
+    unfreeze_epoch: 0
   depth_decoder:
     name: UnetDepthDecoder
     in_channels: 512
     channel_scale_factors: [2, 4, 8, 8]
     out_channels: 1
-    freeze_epoch: None
-    unfreeze_epoch: None
+    freeze_epoch: -1
+    unfreeze_epoch: 0
   necks_and_heads:
-    object_detection_2d:
-      name: FPNFasterRCNN
-      image_size: [256, 1184]
-      pool_output_size: [7, 7] # shared between RoI and output heads
-      num_channels_per_feature_map: [64, 64, 128, 256]
-      out_channels: 256
-      probability_threshold: 0.1
-      iou_threshold: 0.5
-      rpn:
-        - objectness_threshold: 0.5
-        - iou_threshold: 0.7
-        - pre_nms_filtering: 8000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
-        - top_k_proposals_training: 64 # per fpn layer
-        - top_k_proposals_testing: 16 # per fpn layer
-        - anchor_generator:
-          - sizes: [[64], [128], [256], [512]]
-          - aspect_ratios: [0.5, 1, 2]
-        - rpn_head:
-          - number_of_object_proposals_per_anchor: 3
-      roi:
-        - feature_map_names: ["fpn0", "fpn1", "fpn2", "fpn3"]
-        - sampling_ratio: 4
-      output_heads:
-        - num_classes: 4 # number of classes we are trying to predict + background
-        - score_threshold: 0.3
-        - top_k_boxes_training: 256
-        - top_k_boxes_testing: 2
+    name: FPNFasterRCNN
+    image_size: [256, 1184]
+    pool_output_size: [7, 7] # shared between RoI and output heads
+    num_channels_per_feature_map: [64, 64, 128, 256]
+    out_channels: 256
+    probability_threshold: 0.1
+    iou_threshold: 0.5
+    num_classes: 4 # number of classes we are trying to predict + background
+    rpn:
+      - objectness_threshold: 0.5
+      - iou_threshold: 0.7
+      - pre_nms_filtering: 8000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
+      - top_k_proposals_training: 64 # per fpn layer
+      - top_k_proposals_testing: 8 # per fpn layer
+      - anchor_generator:
+        - sizes: [[64], [128], [256], [512]]
+        - aspect_ratios: [0.5, 1, 2]
+      - rpn_head:
+        - number_of_object_proposals_per_anchor: 3
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
+    roi:
+      - feature_map_names: ["fpn0", "fpn1", "fpn2", "fpn3"]
+      - sampling_ratio: 4
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
+    output_heads:
+      - score_threshold: 0.3
+      - top_k_boxes_training: 256
+      - top_k_boxes_testing: 2
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
+    distance_head:
+      - num_conv_layers: 1
+      - num_channels: 256
+      - num_fc_layers: 2
+      - fc_features: 1024
+      - freeze_epoch: 0
+      - unfreeze_epoch: -1
+    attribute_head:
+      - num_conv_layers: 1
+      - num_channels: 256
+      - num_fc_layers: 2
+      - fc_features: 1024
+      - freeze_epoch: 0
+      - unfreeze_epoch: -1
+
+prediction_postprocess: # used only in eval
+  - depth:
+    - min_depth: 0.0
+    - max_depth: 90.0
+  - object_detection: # None
+
 loss:
-  object_detection_2d:
+  object_detection:
     - RPNClassificationAndRegressionLoss
     - RCNNCrossEntropyAndRegressionLoss
-  # object_detection_3d:
+
 optimizer:
   name: Adam
-  lr: 1e-6
+  lr: 1e-5
 
-epochs: 10000
+epochs: 1000
 
 metrics:
-  object_detection_2d:
+  object_detection:
     - mAP
 
 save_path: ../run_info/

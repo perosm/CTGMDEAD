@@ -188,6 +188,7 @@ class RegionProposalNetwork(nn.Module):
         Args:
         """
         # 1) clip proposals
+        objectness_score = objectness_score.detach()
         proposals = clip_boxes_to_image(boxes=proposals, size=self.image_size)
 
         # 2) filter proposals with objectness_score < objectness_threshold
@@ -259,7 +260,7 @@ class RegionProposalNetwork(nn.Module):
             bbox_regression_deltas = bbox_regression_deltas.squeeze(0)
             anchors = clip_boxes_to_image(anchors, self.image_size)
             proposals = apply_deltas_to_boxes(
-                boxes=anchors, deltas=bbox_regression_deltas
+                boxes=anchors, deltas=bbox_regression_deltas.detach()
             )
             filtered_objectness_score, proposals = self._filter_proposals(
                 proposals=proposals,

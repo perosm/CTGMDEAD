@@ -38,7 +38,7 @@ class KittiDataset(Dataset):
         self.camera = camera
         self.camera_index = int(camera[-1])
         self._load_data_paths()
-        if TaskEnum.object_detection_3d in self.task_paths.keys():
+        if TaskEnum.object_detection in self.task_paths.keys():
             self._fetch_projection_matrices()
         self._filter_data_paths()
         self.load_functions = KITTIutils.load_utils(list(self.paths_dict.keys()))
@@ -51,10 +51,10 @@ class KittiDataset(Dataset):
         }
 
     def _fetch_projection_matrices(self) -> None:
-        if not self.paths_dict[TaskEnum.object_detection_3d]:
+        if not self.paths_dict[TaskEnum.object_detection]:
             return
 
-        for ground_truth_objdet3d_path in self.paths_dict[TaskEnum.object_detection_3d]:
+        for ground_truth_objdet3d_path in self.paths_dict[TaskEnum.object_detection]:
 
             calibrations_path = str(ground_truth_objdet3d_path).replace(
                 "ground_truth", "calibrations"
@@ -191,17 +191,15 @@ class KittiDataset(Dataset):
             task_item[task] = self.task_transform[task](
                 self.load_functions[task](self.paths_dict[task][idx])
             )
-        if (
-            TaskEnum.object_detection_3d or TaskEnum.object_detection_2d
-        ) in self.paths_dict.keys():
+        if TaskEnum.object_detection in self.paths_dict.keys():
             frame_id = pathlib.Path(
-                *self.paths_dict[TaskEnum.object_detection_3d][idx].parts[
+                *self.paths_dict[TaskEnum.object_detection][idx].parts[
                     self.UNIQUE_PATH_PARTS_NUMBER :
                 ]
             )
             projection_matrix = self.load_projection_matrix(frame=frame_id)
-            gt = task_item[TaskEnum.object_detection_3d]
-            task_item[TaskEnum.object_detection_3d] = {
+            gt = task_item[TaskEnum.object_detection]
+            task_item[TaskEnum.object_detection] = {
                 "gt_info": gt,
                 "projection_matrix": projection_matrix,
             }

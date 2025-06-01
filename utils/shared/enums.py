@@ -16,8 +16,7 @@ class TaskEnum(enum.StrEnum, metaclass=DirectValueMeta):
     input = "input"
     depth = "depth"
     road_detection = "road_detection"
-    object_detection_2d = "object_detection_2d"
-    object_detection_3d = "object_detection_3d"
+    object_detection = "object_detection"
 
 
 class ObjectDetectionEnum(enum.IntEnum):

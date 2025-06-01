@@ -22,8 +22,7 @@ def task_check_file_extension(task: str, file_path: str):
         TaskEnum.input: [".png"],
         TaskEnum.depth: [".png"],
         TaskEnum.road_detection: [".png"],
-        TaskEnum.object_detection_2d: [".txt"],
-        TaskEnum.object_detection_3d: [".txt"],
+        TaskEnum.object_detection: [".txt"],
     }
 
     if pathlib.Path(file_path).suffix in task_extensions[task]:
@@ -118,7 +117,7 @@ OBJDET_CLASS_MAPPING = {
     "Person_sitting": 2,
     "Cyclist": 2,
     "Tram": 3,
-    "Misc": 3,
+    "Misc": -1,
     "DontCare": -1,
 }
 
@@ -174,8 +173,7 @@ def load_utils(tasks: list[str]) -> dict:
         TaskEnum.input: input_load_util,
         TaskEnum.depth: depth_load_util,
         TaskEnum.road_detection: road_detection_load_util,
-        TaskEnum.object_detection_2d: object_detection_load_util,
-        TaskEnum.object_detection_3d: object_detection_load_util,
+        TaskEnum.object_detection: object_detection_load_util,
     }
     return {task: task_load_type[task]() for task in tasks}
 

@@ -21,7 +21,7 @@ train:
   savers:
     LossSaver: LossAggregator # bind aggregator to saver
 
-epochs: 30
+epochs: 100
 
 
 model:
@@ -45,7 +45,11 @@ model:
     freeze_epoch: None
     unfreeze_epoch: None
 
-prediction_processors: [road_detection]
+prediction_postprocess: # used only in eval
+  - depth:
+    - min_depth: 0.0
+    - max_depth: 90.0
+  - road_detection: # None
 
 loss:
   road_detection:
@@ -71,4 +75,4 @@ metrics:
     - TrueNegativeRate
     - F1Score
 
-save_path: ../run_info
+save_path: ../run_info/
