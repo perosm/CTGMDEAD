@@ -4,11 +4,6 @@ import pathlib
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from utils.shared.visual_inspection import (
-    project_3d_bbox_to_image,
-    draw_3d_bbox,
-    draw_bbox,
-)
 
 
 def main():
@@ -37,8 +32,6 @@ def main():
     ) in zip(mapping_info_indexes, ground_truth_paths, calibration_paths):
         date, drive, frame = mapping_info[frame_index - 1]
         subfolders = pathlib.Path(f"{date}/{drive}/image_02/data")
-        # input_image_path = input_images_dir / subfolders / f"{frame}.png"
-        # visual_inspection(input_image_path, ground_truth_path, calibration_path)
         ground_truth_destination_dir = (
             destination_root_folder / "ground_truth" / subfolders
         )
@@ -61,62 +54,6 @@ def main():
 
     print(f"Number of files: {num_files / 2}")
     print(f"Number of mappings: {len(mapping_info_indexes)}")
-
-
-def visual_inspection(
-    input_image_path: pathlib.Path,
-    object_detection_info_path: pathlib.Path,
-    object_detection_calibration_path: pathlib.Path,
-):
-    image = cv2.cvtColor(cv2.imread(input_image_path), cv2.COLOR_BGR2RGB)
-    objects_info = _read_objects_info(object_detection_info_path)
-    projection_matrix = _read_projection_matrix(object_detection_calibration_path)
-    fig, ax = plt.subplots(2, 1)
-    image_2d_bboxes = image.copy()
-    image_3d_bboxes = image.copy()
-    for object_info in objects_info:
-        bbox_2d = np.array(
-            [int(float(image_coords)) for image_coords in object_info[4:8]]
-        )
-        bbox_3d = np.array([float(world_coords) for world_coords in object_info[8:15]])
-        draw_bbox(image_2d_bboxes, bbox_2d)
-        projected_points = project_3d_bbox_to_image(bbox_3d, projection_matrix)
-        draw_3d_bbox(image_3d_bboxes, projected_points)
-
-    ax[0].imshow(image_2d_bboxes)
-    ax[1].imshow(image_3d_bboxes)
-
-    def on_key():
-        plt.close()
-
-    plt.tight_layout()
-    fig.canvas.mpl_connect("key_press_event", on_key)
-    plt.show()
-
-
-def _read_objects_info(object_detection_info_path: pathlib.Path):
-    with open(object_detection_info_path, "r") as file:
-        objects_info = [line.strip().split() for line in file.readlines()]
-
-    return objects_info
-
-
-def _read_projection_matrix(object_detection_calibration_path: pathlib.Path):
-    with open(object_detection_calibration_path, "r") as file:
-        last_row = np.array([[0, 0, 0, 1]])
-        projection_matrix = np.vstack(
-            (
-                np.array(
-                    [
-                        float(number)
-                        for number in file.readlines()[2].split(": ")[1].strip().split()
-                    ]
-                ).reshape(3, 4),
-                last_row,
-            )
-        )
-
-    return projection_matrix
 
 
 def _parse_args() -> argparse.Namespace:

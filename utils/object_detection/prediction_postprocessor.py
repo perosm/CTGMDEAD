@@ -1,6 +1,9 @@
 import torch
 from torch import nn
-from utils.object_detection_3d.utils import inverse_normalize_keypoints_by_proposals
+from utils.object_detection_3d.utils import (
+    inverse_normalize_predicted_keypoints_by_proposals,
+    project_2d_points_to_3d_points,
+)
 
 
 class PredictionPostprocessor(nn.Module):
@@ -30,29 +33,17 @@ class PredictionPostprocessor(nn.Module):
         rotation_y = torch.atan2(sin_theta, cos_theta).view(num_objects, -1)
 
         # Fetch object center in 3D space
-        keypoints = inverse_normalize_keypoints_by_proposals(
-            keypoints=keypoints, pos_proposals=bounding_boxes_2d
+        inverse_normalized_keypoints = (
+            inverse_normalize_predicted_keypoints_by_proposals(
+                pred_keypoints=keypoints, pos_proposals=bounding_boxes_2d
+            )
         )
-        object_center_2d = keypoints[:, :, KEYPOINT_INDEX]
-        ones = torch.ones(num_objects, 1).to(projection_matrix.device)
-        object_center_2d_homogeneous = torch.cat(
-            [object_center_2d, ones], dim=1
-        ) * distance.view(num_objects, -1)
-
-        last_row = torch.zeros(1, 4).to(projection_matrix.device)
-        last_row[:, -1] = 1
-        projection_matrix_inv = torch.linalg.inv(
-            torch.cat([projection_matrix, last_row], dim=0)
-        )[:3, :]
-        object_center_3d_homogeneous = (
-            projection_matrix_inv.T @ object_center_2d_homogeneous.T
-        ).T
-
-        last_col = (
-            object_center_3d_homogeneous[:, -1][:, None] + 1e-6
-        )  # Prevent 0 division
-        object_center_3d = (object_center_3d_homogeneous / last_col)[:, :3]
-
+        object_center_2d = inverse_normalized_keypoints[:, :, KEYPOINT_INDEX]
+        object_center_3d = project_2d_points_to_3d_points(
+            points_2d=object_center_2d,
+            depth=distance,
+            projection_matrix=projection_matrix,
+        )
         return torch.cat([size, object_center_3d, rotation_y], dim=-1)
 
     def forward(

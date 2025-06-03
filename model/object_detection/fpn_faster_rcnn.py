@@ -59,6 +59,7 @@ class FPNFasterRCNN(nn.Module):
         super().__init__()
         self.image_size = configs["image_size"]
         self.pool_output_size = configs["pool_output_size"]
+        self.feature_map_names = configs["feature_map_names"]
         self.num_channels_per_feature_map = configs["num_channels_per_feature_map"]
         self.out_channels = configs["out_channels"]
         self.probability_threshold = configs["probability_threshold"]
@@ -102,7 +103,9 @@ class FPNFasterRCNN(nn.Module):
         rpn_config = list_of_dict_to_dict(
             list_of_dicts=rpn_config, new_dict={}, depth_cnt=1
         )
-        return RegionProposalNetwork(configs=rpn_config)
+        return RegionProposalNetwork(
+            configs=rpn_config, feature_map_names=self.feature_map_names
+        )
 
     def _configure_region_of_interest_network(
         self, roi_config: list[dict]
@@ -111,7 +114,7 @@ class FPNFasterRCNN(nn.Module):
         return ROINetwork(
             image_size=self.image_size,
             pool_output_size=self.pool_output_size,
-            feature_map_names=roi_config["feature_map_names"],
+            feature_map_names=self.feature_map_names,
             sampling_ratio=roi_config["sampling_ratio"],
         )
 
@@ -258,32 +261,32 @@ class FPNFasterRCNN(nn.Module):
         fpn_outputs = self.linker_layer(fpn_outputs=fpn_outputs)
         (
             all_anchors,  # (num_anchors, 4)
-            all_objectness_scores,  # (num_anchors)
+            all_objectness_logits,  # (num_anchors)
             all_anchor_deltas,  # (num_anchors, 4)
-            filtered_objectness_scores,  # (num_proposals)
+            filtered_objectness_logits,  # (num_proposals)
             filtered_proposals,  # (num_proposals, 4)
         ) = self.rpn(fpn_feature_map_outputs=fpn_outputs)
 
-        pooled_proposals = self.roi(
+        filtered_pooled_proposals = self.roi(
             fpn_feature_map_outputs=fpn_outputs,
             proposals=filtered_proposals,
         )
 
         class_logits, filtered_proposals, proposal_deltas = self.output_heads(
-            pooled_proposals_per_feature_map=pooled_proposals,
+            pooled_proposals_per_feature_map=filtered_pooled_proposals,
             proposals=filtered_proposals,
         )
 
         if self.training:
-            distance_head_output = self.distance_head(pooled_proposals)
-            size, yaw, keypoints = self.attribute_head(pooled_proposals)
+            distance_head_output = self.distance_head(filtered_pooled_proposals)
+            size, yaw, keypoints = self.attribute_head(filtered_pooled_proposals)
 
             return {
                 "rpn": (
                     all_anchors,  # (num_anchors, 4)
-                    all_objectness_scores,  # (num_anchors)
+                    all_objectness_logits,  # (num_anchors)
                     all_anchor_deltas,  # (num_anchors, 4)
-                    filtered_objectness_scores,  # (num_proposals)
+                    filtered_objectness_logits,  # (num_proposals)
                     filtered_proposals,  # (num_proposals, 4)
                 ),
                 "faster-rcnn": (class_logits, filtered_proposals, proposal_deltas),

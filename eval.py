@@ -12,11 +12,6 @@ from utils.shared.utils import (
     move_data_to_gpu,
     configure_visualizers,
 )
-from utils.shared.visual_inspection import (
-    plot_object_detection_predictions_2d,
-    plot_projected_height,
-    plot_od_3d_output,
-)
 from utils.shared.aggregators.MetricsAggregator import MetricsAggregator
 from utils.shared.savers.MetricSavers import MetricsSaver
 

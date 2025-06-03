@@ -71,10 +71,11 @@ class DistanceHead(nn.Module):
             )
             for i in range(self.num_fc_layers)
         )
-        self.head = nn.Sequential(
-            nn.Linear(in_features=self.fc_features, out_features=self.out_features),
-            nn.ReLU(inplace=True),
+        self.head = nn.Linear(
+            in_features=self.fc_features, out_features=self.out_features
         )
+        nn.init.normal_(self.head.weight, std=0.001)
+        nn.init.constant_(self.head.bias, 0)
 
     def _forward_convs(self, x: torch.Tensor) -> torch.Tensor:
         for conv in self.convs:

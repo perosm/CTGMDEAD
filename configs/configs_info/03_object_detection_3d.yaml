@@ -42,6 +42,7 @@ model:
     name: FPNFasterRCNN
     image_size: [256, 1184]
     pool_output_size: [7, 7] # shared between RoI and output heads
+    feature_map_names: ["fpn0", "fpn1", "fpn2", "fpn3"]
     num_channels_per_feature_map: [64, 64, 128, 256]
     out_channels: 256
     probability_threshold: 0.1
@@ -63,24 +64,23 @@ model:
     roi:
       - freeze_epoch: -1
       - unfreeze_epoch: 0
-      - feature_map_names: ["fpn0", "fpn1", "fpn2", "fpn3"]
       - sampling_ratio: 4
     output_heads:
-      - freeze_epoch: 0
-      - unfreeze_epoch: 200
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
       - score_threshold: 0.3
       - top_k_boxes_training: 256
       - top_k_boxes_testing: 2
     distance_head:
-      - freeze_epoch: 0
-      - unfreeze_epoch: 200
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
       - num_conv_layers: 1
       - num_channels: 256
       - num_fc_layers: 2
       - fc_features: 1024
     attribute_head:
-      - freeze_epoch: 0
-      - unfreeze_epoch: 200
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
       - num_conv_layers: 1
       - num_channels: 256
       - num_fc_layers: 2
@@ -105,7 +105,7 @@ optimizer:
   name: Adam
   lr: 1e-5
 
-epochs: 1000
+epochs: 1001
 
 metrics:
   object_detection:

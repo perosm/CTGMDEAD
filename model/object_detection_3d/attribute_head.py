@@ -91,15 +91,21 @@ class AttributeHead(nn.Module):
         self.size_head = nn.Linear(
             in_features=self.fc_features, out_features=self.size_head_out_features
         )
+        nn.init.normal_(self.size_head.weight, std=0.001)
+        nn.init.constant_(self.size_head.bias, 0)
 
         self.yaw_head = nn.Linear(
             in_features=self.fc_features, out_features=self.yaw_head_out_features
         )
+        nn.init.normal_(self.yaw_head.weight, std=0.001)
+        nn.init.constant_(self.yaw_head.bias, 0)
 
         self.keypoints_head = nn.Linear(
             in_features=self.fc_features,
             out_features=self.keypoints_head_out_features,
         )
+        nn.init.normal_(self.keypoints_head.weight, std=0.001)
+        nn.init.constant_(self.keypoints_head.bias, 0)
 
     def _forward_convs(self, x: torch.Tensor) -> torch.Tensor:
         for conv in self.convs:

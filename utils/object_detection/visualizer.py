@@ -82,7 +82,7 @@ class Visualizer(VisualizerStrategy):
         # Solves error: Layout of the output array img is incompatible with cv::Mat
         # https://stackoverflow.com/questions/26998223/what-is-the-difference-between-contiguous-and-non-contiguous-arrays
         image = np.ascontiguousarray(image)
-        pred = (
+        projected_pred_boxes = (
             project_3d_boxes_to_image(
                 boxes_3d_info=pred, projection_matrix=projection_matrix
             )
@@ -104,8 +104,12 @@ class Visualizer(VisualizerStrategy):
             .astype(np.int32)
         )
 
-        for pred_info in pred:
-            Visualizer.draw_3d_box(image=image, box_3d=pred_info, color=(255, 0, 0))
+        print("Pred: ", pred)
+        print("Gt:", gt)
+        for projected_pred_box in projected_pred_boxes:
+            Visualizer.draw_3d_box(
+                image=image, box_3d=projected_pred_box, color=(255, 0, 0)
+            )
 
         for projected_box, projected_height in zip(projected_boxes, projected_heights):
             Visualizer.draw_3d_box(image=image, box_3d=projected_box, color=(0, 255, 0))

@@ -34,12 +34,13 @@ class LossSaver(Saver):
                     label=loss_name,
                 )
                 ax[row + 1].set_title(task)
+                ax[row + 1].legend()
                 total_loss_per_task += loss_value
             total_loss += total_loss_per_task
             ax[0].plot(epochs_array, total_loss_per_task.cpu().numpy(), label=task)
         ax[0].plot(epochs_array, total_loss.cpu().numpy())
         ax[0].set_title("Losses")
-        fig.legend()
+        ax[0].legend()
         plt.ioff()
         plt.savefig(self.save_dir / "losses.png")
         plt.close()

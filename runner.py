@@ -50,7 +50,7 @@ def _parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--cntr",
+        "-cntr",
         "--config-numbers-track-ran",
         type=pathlib.Path,
         default=pathlib.Path("./configs/config_numbers_track_ran.txt"),

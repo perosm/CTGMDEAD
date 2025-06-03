@@ -1,11 +1,7 @@
 import torch
 from torch import nn
-from torchvision.ops import box_iou, clip_boxes_to_image
-from utils.object_detection.utils import (
-    apply_deltas_to_boxes,
-    get_deltas_from_bounding_boxes,
-)
-from torchvision.ops import sigmoid_focal_loss
+from torchvision.ops import box_iou
+from utils.object_detection.utils import get_deltas_from_bounding_boxes
 from utils.shared.enums import ObjectDetectionEnum
 
 
@@ -19,8 +15,11 @@ class RPNClassificationAndRegressionLoss(nn.Module):
         self.iou_negative_threshold = 0.3
         self.iou_positive_threshold = 0.7
         self.regularization_factor = 10.0
-        self.classification_loss_fn = nn.BCELoss(
-            reduction="mean",
+        positive_weight = torch.FloatTensor(
+            [self.negatives_ratio / self.positives_ratio]
+        ).cuda()
+        self.classification_loss_fn = nn.BCEWithLogitsLoss(
+            reduction="mean", pos_weight=positive_weight
         ).to("cuda")
         self.regression_loss_fn = nn.SmoothL1Loss(reduction="mean").to("cuda")
         self.register_forward_pre_hook(
@@ -134,9 +133,6 @@ class RPNClassificationAndRegressionLoss(nn.Module):
         regression_loss = self.regularization_factor * self.regression_loss_fn(
             pred_deltas_sampled, gt_deltas
         )
-        print(
-            f"Regression loss: {regression_loss.item()}, classification loss: {classification_loss.item()}"
-        )
 
         return classification_loss + self.regularization_factor * regression_loss
 
@@ -152,7 +148,11 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         self.n_cls = 256
         self.num_classes = 4
         self.regularization_factor = 10.0
-        class_weights = torch.FloatTensor([1, 3, 3, 3]).cuda()
+        negative_weight = self.negatives_ratio / self.negatives_ratio
+        positive_weight = self.negatives_ratio / self.positives_ratio
+        class_weights = torch.FloatTensor(
+            [negative_weight, positive_weight, positive_weight, positive_weight]
+        ).cuda()
         self.classification_loss_fn = nn.CrossEntropyLoss(
             reduction="mean", weight=class_weights
         )
@@ -257,7 +257,5 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         regression_loss = self.regression_loss_fn(
             pred_deltas_pos_per_class, gt_deltas_per_pred
         )
-        print(
-            f"Regression loss: {regression_loss.item()}, classification loss: {classification_loss.item()}"
-        )
+
         return classification_loss + self.regularization_factor * regression_loss

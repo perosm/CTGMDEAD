@@ -58,7 +58,7 @@ def project_3d_boxes_to_image(
     projections = projection_matrix.unsqueeze(0) @ corners_homogeneous
     projections = projections[:, :2, :] / projections[:, 2, :].unsqueeze(1)
 
-    return projections.to(torch.int16)
+    return projections.to(torch.float32)
 
 
 def project_3d_points_to_image(
@@ -81,7 +81,7 @@ def project_3d_points_to_image(
 
     return (homogeneous_coordinates_2d / homogeneous_coordinates_2d[:, 2][:, None])[
         :, :2
-    ].to(torch.int16)
+    ].to(torch.float32)
 
 
 def match_proposals_to_objects(
@@ -118,38 +118,38 @@ def match_proposals_to_objects(
     return pos_proposal_indices, pos_gt_indices
 
 
-def normalize_keypoints_by_proposals(
-    keypoints: torch.Tensor, pos_proposals: torch.Tensor
+def normalize_gt_keypoints_by_proposals(
+    pos_gt_keypoints: torch.Tensor, pos_proposals: torch.Tensor
 ) -> torch.Tensor:
     """
     Used when training.
-    Let (x1, y1, x2, y2) denote top-left and bottom-right corners of the proposals
+    Let (x1, y1, x2, y2) denote top-left and bottom-right corners of the ground truths
     and (p1, p2) denote the keypoint coordinates, the keypoints are normalized as follows:
 
     t1 = (p1 - x1) / (x2 - x1)
     t2 = (p2 - y1) / (y2 - y1)
 
     Args:
-        keypoints: Projected bounding box 3d keypoints of shape (num_pos_proposals, 2, 9).
+        pos_gt_keypoints: Projected bounding box 3d keypoints of shape (num_pos_proposals, 2, 9).
         proposals: Positive proposals of shape (num_pos_proposals, 4).
 
     Returns:
-        Keypoints normalized by the above formula of shape (num_pos_proposals, 2, 9).
+        Positive ground truth keypoints normalized by the above formula of shape (num_pos_proposals, 2, 9).
     """
     num_pos_proposals = pos_proposals.shape[0]
     x1, y1, x2, y2 = pos_proposals.unbind(dim=-1)
-    keypoints[:, 0, :] = (keypoints[:, 0, :] - x1.view(num_pos_proposals, -1)) / (
-        x2.view(num_pos_proposals, -1) - x1.view(num_pos_proposals, -1)
-    )
-    keypoints[:, 1, :] = (keypoints[:, 1, :] - y1.view(num_pos_proposals, -1)) / (
-        y2.view(num_pos_proposals, -1) - y1.view(num_pos_proposals, -1)
-    )
+    keypoints_x_normalized = (
+        pos_gt_keypoints[:, 0, :] - x1.view(num_pos_proposals, -1)
+    ) / (x2.view(num_pos_proposals, -1) - x1.view(num_pos_proposals, -1))
+    keypoints_y_normalized = (
+        pos_gt_keypoints[:, 1, :] - y1.view(num_pos_proposals, -1)
+    ) / (y2.view(num_pos_proposals, -1) - y1.view(num_pos_proposals, -1))
 
-    return keypoints
+    return torch.stack([keypoints_x_normalized, keypoints_y_normalized], dim=1)
 
 
-def inverse_normalize_keypoints_by_proposals(
-    keypoints: torch.Tensor, pos_proposals: torch.Tensor
+def inverse_normalize_predicted_keypoints_by_proposals(
+    pred_keypoints: torch.Tensor, pos_proposals: torch.Tensor
 ) -> torch.Tensor:
     """
     Used when evaluating.
@@ -160,7 +160,7 @@ def inverse_normalize_keypoints_by_proposals(
     p2 = y1 + t2 * (y2 - y1)
 
     Args:
-        keypoints: Projected and normalized bounding box 3d keypoints of shape (num_pos_proposals, 18).
+        keypoints: Projected and normalized bounding box 3d keypoints of shape (num_pos_proposals, 2, 9).
         proposals: Positive proposals of shape (num_pos_proposals, 4).
 
     Returns:
@@ -168,11 +168,40 @@ def inverse_normalize_keypoints_by_proposals(
     """
     num_pos_proposals = pos_proposals.shape[0]
     x1, y1, x2, y2 = pos_proposals.unbind(dim=-1)
-    keypoints[:, 0, :] = x1.view(num_pos_proposals, -1) + keypoints[:, 0, :] * (
-        x2.view(num_pos_proposals, -1) - x1.view(num_pos_proposals, -1)
-    )
-    keypoints[:, 1, :] = y1.view(num_pos_proposals, -1) + keypoints[:, 1, :] * (
-        y2.view(num_pos_proposals, -1) - y1.view(num_pos_proposals, -1)
-    )
+    keypoints_x_normalized = x1.view(num_pos_proposals, -1) + pred_keypoints[
+        :, 0, :
+    ] * (x2.view(num_pos_proposals, -1) - x1.view(num_pos_proposals, -1))
+    keypoints_y_normalized = y1.view(num_pos_proposals, -1) + pred_keypoints[
+        :, 1, :
+    ] * (y2.view(num_pos_proposals, -1) - y1.view(num_pos_proposals, -1))
 
-    return keypoints
+    return torch.stack([keypoints_x_normalized, keypoints_y_normalized], dim=1)
+
+
+def project_2d_points_to_3d_points(
+    points_2d: torch.Tensor, depth: torch.Tensor, projection_matrix: torch.Tensor
+):
+    """
+    https://www.zemris.fer.hr/~ssegvic/vision/cv3d_stereo.pdf
+
+    x_camera / X_world = focal_length / depth
+    y_camera / Y_world = focal_length / depth
+
+    Args:
+        points_2d: Points in the camera plane of shape (num_objects, 2).
+        depth: Depth corresponding to each of the points of shape (num_objects).
+        focal_x: Focal length of the camera matrix.
+
+    Returns:
+        Points in 3D space corresponding to the 2D points in camera plane.
+    """
+    focal_x = projection_matrix[0, 0]
+    focal_y = projection_matrix[1, 1]
+    cx = projection_matrix[0, 2]
+    cy = projection_matrix[1, 2]
+    x_camera, y_camera = points_2d.unbind(dim=-1)
+    X_world = (x_camera - cx) * depth / focal_x
+    Y_world = (y_camera - cy) * depth / focal_y
+    Z_world = depth
+
+    return torch.stack([X_world, Y_world, Z_world], dim=-1)

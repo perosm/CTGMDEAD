@@ -60,5 +60,4 @@ class Visualizer:
 
         plt.tight_layout()
         plt.savefig(save_path)
-        plt.show()
         plt.close()

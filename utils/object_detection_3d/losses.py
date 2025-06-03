@@ -7,11 +7,9 @@ from utils.object_detection_3d.utils import (
     match_proposals_to_objects,
     project_3d_boxes_to_image,
     project_3d_points_to_image,
-    normalize_keypoints_by_proposals,
+    normalize_gt_keypoints_by_proposals,
 )
 
-
-# TODO: refactor and shared move to prediction_postprocess
 PROPOSAL_INDEX = 4
 GT_BOX_2D_SLICE = slice(
     ObjectDetectionEnum.box_2d_left, ObjectDetectionEnum.box_2d_bottom + 1
@@ -22,7 +20,7 @@ class UncertaintyAwareRegressionLoss(nn.Module):
     def __init__(self, name: str = "UncertaintyAwareRegressionLoss"):
         super().__init__()
         self.name = name
-        self.lambda_H = 0.25
+        self.lambda_H = 1
         self.lambda_h_rec = 1
         self.iou_positive_threshold = 0.5
         self.register_forward_pre_hook(self._extract_relevant_tensor_info)
@@ -51,11 +49,11 @@ class UncertaintyAwareRegressionLoss(nn.Module):
         )
 
         # Extract ground truth info
-        gt_object_info = gt_object_info[pos_gt_indices]
+        pos_gt_object_info = gt_object_info[pos_gt_indices]
         projection_matrix = ground_truth["projection_matrix"].squeeze(0)
 
-        gt_H = gt_object_info[:, ObjectDetectionEnum.height]
-        gt_distance = gt_object_info[:, ObjectDetectionEnum.z]
+        gt_H = pos_gt_object_info[:, ObjectDetectionEnum.height]
+        gt_distance = pos_gt_object_info[:, ObjectDetectionEnum.z]
         focal_x = projection_matrix[0, 0]
         gt_h_rec = gt_distance / (focal_x * gt_H)
 
@@ -91,15 +89,14 @@ class UncertaintyAwareRegressionLoss(nn.Module):
             Uncertainty aware regression loss for height in world coordinate frame
             and reciprocal height in camera coordinate frame.
         """
-        L_H = (
-            F.l1_loss(pred_H, gt_H, reduction="none") / torch.exp(pred_log_sigma_H)
-            + self.lambda_H * pred_log_sigma_H
-        )
-        L_h_rec = (
-            F.l1_loss(pred_h_rec, gt_h_rec, reduction="none")
-            / torch.exp(pred_log_sigma_h_rec)
-            + self.lambda_h_rec * pred_log_sigma_h_rec
-        )
+        L_H = F.l1_loss(pred_H, gt_H, reduction="none")
+        # / torch.exp(pred_log_sigma_H)
+        #     + self.lambda_H * pred_log_sigma_H
+        # )
+        L_h_rec = F.l1_loss(pred_h_rec, gt_h_rec, reduction="none")
+        #     / torch.exp(pred_log_sigma_h_rec)
+        #     + self.lambda_h_rec * pred_log_sigma_h_rec
+        # )
 
         return (L_H + L_h_rec).mean()
 
@@ -220,25 +217,21 @@ class L1KeypointsLoss(nn.Module):
         )
         # We only use proposals that are positive (i.e. overlap with g.t. > threshold)
         pos_proposals = proposals[pos_proposal_indices]
-        pred_keypoints = pred_keypoints[pos_proposal_indices]
-        gt_keypoints = gt_keypoints[pos_gt_indices]
+        pos_pred_keypoints = pred_keypoints[pos_proposal_indices]
+        pos_gt_keypoints = gt_keypoints[pos_gt_indices]
 
-        # Normalize positives
-        pred_normalized_keypoints = normalize_keypoints_by_proposals(
-            keypoints=pred_keypoints,
-            pos_proposals=pos_proposals,
-        )
-        gt_normalized_keypoints = normalize_keypoints_by_proposals(
-            keypoints=gt_keypoints, pos_proposals=pos_proposals
+        # Normalize ground truth positives
+        gt_normalized_keypoints = normalize_gt_keypoints_by_proposals(
+            pos_gt_keypoints=pos_gt_keypoints, pos_proposals=pos_proposals
         )
 
-        return pred_normalized_keypoints.flatten(1), gt_normalized_keypoints.flatten(1)
+        return pos_pred_keypoints.flatten(1), gt_normalized_keypoints.flatten(1)
 
     def forward(
         self,
         pred_normalized_keypoints: torch.Tensor,
         gt_normalized_keypoints: torch.Tensor,
     ) -> torch.Tensor:
-        return self.lambda_keypoints * F.l1_loss(
+        return F.l1_loss(
             pred_normalized_keypoints, gt_normalized_keypoints, reduction="mean"
         )

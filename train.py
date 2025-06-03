@@ -3,11 +3,6 @@ import logging
 import eval
 
 from tqdm import tqdm
-from utils.shared.visual_inspection import (
-    plot_task_gt,
-    plot_object_detection_predictions_2d,
-    plot_projected_height,
-)
 from utils.shared.aggregators.LossAggregator import LossAggregator
 from utils.shared.savers.LossSaver import LossSaver
 
@@ -48,7 +43,7 @@ def train(args: dict):
     loss_saver = LossSaver(loss_aggregator=loss_aggregator, save_dir=save_dir)
 
     data = next(iter(train_dataloader))
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs), "Training..."):
         freeze_model(model, args["model"], epoch)
         # plot_projected_height(data)
         data = move_data_to_gpu(data)
@@ -61,9 +56,9 @@ def train(args: dict):
         loss_aggregator.aggregate_per_batch(per_batch_task_losses)
         logger.log(
             logging.INFO,
-            f"epoch: {epoch}; loss: {loss}, per_batch_task_losses: {per_batch_task_losses}",
+            f"epoch: {epoch}; loss: {loss.item()}, per_batch_task_losses: {per_batch_task_losses}",
         )
-        if epoch % 5 == 0 and epoch != 0:
+        if epoch % 100 == 0 and epoch != 0:
             print(f"Epoch: {epoch}")
             eval.eval(args, model, epoch)
             model.train()

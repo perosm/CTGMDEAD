@@ -9,7 +9,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
-from torch.optim import Optimizer, Adam
+from torch.optim import Optimizer, Adam, SGD
 from utils.shared.savers.Saver import Saver
 from utils.shared.savers.LossSaver import LossSaver
 from utils.shared.aggregators.Aggregator import Aggregator
@@ -307,7 +307,7 @@ def configure_loss(loss_configs: dict) -> MultiTaskLoss:
 
 
 def configure_optimizer(model: nn.Module, optimizer_configs: dict) -> Optimizer:
-    optimizer_dict = {Adam.__name__: Adam}
+    optimizer_dict = {Adam.__name__: Adam, SGD.__name__: SGD}
 
     return optimizer_dict[optimizer_configs["name"]](
         model.parameters(), float(optimizer_configs["lr"])
