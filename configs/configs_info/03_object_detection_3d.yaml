@@ -95,17 +95,23 @@ prediction_postprocess: # used only in eval
 loss:
   object_detection: 
     - RPNClassificationAndRegressionLoss
+      # - regularization_factor: 1
     - RCNNCrossEntropyAndRegressionLoss
+      # - regularization_factor: 1
     - UncertaintyAwareRegressionLoss
+      # - regularization_factor: 1
     - L1SizeLoss
+      # - regularization_factor: 1
     - L1YawLoss
+      # - regularization_factor: 1
     - L1KeypointsLoss
+      # - regularization_factor: 1
 
 optimizer:
   name: Adam
-  lr: 1e-5
+  lr: 1e-6
 
-epochs: 1001
+epochs: 10001
 
 metrics:
   object_detection:
