@@ -150,6 +150,7 @@ def configure_model(model_configs: dict, device: torch.device) -> nn.Module:
         road_detection_decoder=road_detection_decoder,
         heads_and_necks=necks_and_heads,
     )
+    _load_model_weights()
     print_model_size(model)
 
     return model
@@ -186,6 +187,10 @@ def _configure_necks_and_heads(
         return None
 
     return FPNFasterRCNN(necks_and_heads_configs)
+
+
+def _load_model_weights():  # TODO:
+    pass
 
 
 def print_model_size(model: nn.Module) -> None:
@@ -261,9 +266,6 @@ def freeze_params(
      - layers: Dictionary whose keys represent top level building blocks
                and whose values represent lower level components such as
                convolutions, batchnorm etc...
-
-    Returns:
-     - model: Module with frozen/unfrozen layers.
     """
     print(f"Module: {model._get_name()}")
     pattern = None

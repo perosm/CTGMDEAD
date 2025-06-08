@@ -1,4 +1,4 @@
-!/bin/bash
+# !/bin/bash
 
 folder="./data/kitti/input"
 
@@ -49,7 +49,6 @@ files=(
 2011_09_26_drive_0106
 2011_09_26_drive_0113
 2011_09_26_drive_0117
-2011_09_26_drive_0119
 2011_09_28_calib.zip
 2011_09_28_drive_0001
 2011_09_28_drive_0002
@@ -143,12 +142,10 @@ files=(
 2011_09_28_drive_0216
 2011_09_28_drive_0220
 2011_09_28_drive_0222
-2011_09_28_drive_0225
 2011_09_29_calib.zip
 2011_09_29_drive_0004
 2011_09_29_drive_0026
 2011_09_29_drive_0071
-2011_09_29_drive_0108
 2011_09_30_calib.zip
 2011_09_30_drive_0016
 2011_09_30_drive_0018
@@ -157,13 +154,11 @@ files=(
 2011_09_30_drive_0028
 2011_09_30_drive_0033
 2011_09_30_drive_0034
-2011_09_30_drive_0072
 2011_10_03_calib.zip
 2011_10_03_drive_0027
 2011_10_03_drive_0034
 2011_10_03_drive_0042
 2011_10_03_drive_0047
-2011_10_03_drive_0058
 )
 mkdir -p $folder
 url='https://s3.eu-central-1.amazonaws.com/avg-kitti/raw_data'
@@ -201,8 +196,7 @@ rm -rf "./data/kitti/$semseg_foldername"
 
 file_urls=(
     https://s3.eu-central-1.amazonaws.com/avg-kitti/data_depth_annotated.zip # depth
-    object detection
-    https://s3.eu-central-1.amazonaws.com/avg-kitti/data_object_label_2.zip
+    https://s3.eu-central-1.amazonaws.com/avg-kitti/data_object_label_2.zip # object_detection
     https://s3.eu-central-1.amazonaws.com/avg-kitti/data_object_calib.zip
     https://s3.eu-central-1.amazonaws.com/avg-kitti/devkit_object.zip
 )

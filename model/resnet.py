@@ -201,37 +201,13 @@ def ResNet18(pretrained: bool = True) -> ResNet:
         - pretrained: flag to indicate whether to load imagenet pretrained ResNet18.
 
     Returns:
-        - model:
+        - ResNet18 model.
     """
     model = ResNet(blocks_per_layer=[2, 2, 2, 2], block=BasicBlock)
-    if pretrained:
-        resnet_18 = torchvision.models.resnet18(
-            weights="ResNet18_Weights.IMAGENET1K_V1"
-        )
-        model.load_state_dict(resnet_18.state_dict(), strict=True)
+    # if pretrained:
+    #     resnet_18 = torchvision.models.resnet18(
+    #         weights="ResNet18_Weights.IMAGENET1K_V1"
+    #     )
+    #     model.load_state_dict(resnet_18.state_dict(), strict=True)
 
     return model
-
-
-def ResNet50(pretrained: bool = True):
-    model = ResNet(blocks_per_layer=[2, 2, 2, 2], block=BasicBlock)
-    if pretrained:
-        resnet_18 = torchvision.models.resnet18(
-            weights="ResNet18_Weights.IMAGENET1K_V1"
-        )
-        model.load_state_dict(resnet_18.state_dict(), strict=True)
-
-
-if __name__ == "__main__":
-    device = "cuda"
-    # resnet_18 = torchvision.models.resnet18(
-    #     weights="ResNet18_Weights.IMAGENET1K_V1"
-    # ).to(device)
-    # model = ResNet18(pretrained=True).to(device)
-
-    # x = torch.zeros(1, 3, 256, 256).to(device)
-    # with torch.no_grad():
-    #     gt = resnet_18(x)
-    #     pred = model(x)
-
-    # assert (gt - pred).sum() == 0, "They are not the same!"

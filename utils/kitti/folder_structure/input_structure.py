@@ -1,8 +1,7 @@
-""" """
-
 import shutil
 import pathlib
 import argparse
+from tqdm import tqdm
 
 
 def main():
@@ -15,7 +14,7 @@ def main():
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-rdp",
+        "-rip",
         "--root-input-path",
         default=pathlib.Path("./data/kitti/input"),
         type=pathlib.Path,
@@ -45,7 +44,7 @@ def move_camera_02_input_files_and_remove_unecessary(
                              reorganized depth data. Parent directories will be created if they don't exist.
     """
     initial_dirs = sorted(root_input_path.iterdir())
-    for curr_dir in initial_dirs:
+    for curr_dir in tqdm(initial_dirs, "Moving files..."):
         date = "_".join(curr_dir.stem.split("_")[:3])  # year_month_day
         if "calib" in str(curr_dir):
             calib_destination_dir = root_input_path / date  # input/year_month_day

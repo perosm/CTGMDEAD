@@ -72,7 +72,9 @@ def move_camera_02_depth_files_and_remove_unecessary(
             )
             target_path.mkdir(parents=True, exist_ok=True)
             if source_path.exists():
-                shutil.move(source_path, target_path)
+                for file in source_path.iterdir():
+                    shutil.move(str(file), str(target_path))
+                source_path.rmdir()
 
     shutil.rmtree(root_depth_path)
 

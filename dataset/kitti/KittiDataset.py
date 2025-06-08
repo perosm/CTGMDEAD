@@ -18,6 +18,7 @@ class KittiDataset(Dataset):
         self,
         task_paths: dict[str, str],
         task_transform: dict[str, list],
+        task_data_split: dict[str, list[str]] = None,
         camera: str = "image_02",
     ) -> None:
         """
@@ -27,16 +28,20 @@ class KittiDataset(Dataset):
           - paths: paths to input data and ground truth for neural networks tasks (e.g. object detection, depth estimation...)
                    paired with the path to the folder where the ground truth for each of the tasks is stored.
         """
+        self.camera = camera
+        self.camera_index = int(camera[-1])
         self.ground_truth_path_to_projection_matrices = {}
+
         self.task_transform = self._configure_transforms(
             KITTIutils.task_tranform_mapping(task_transform)
         )
+        if task_data_split:
+            pass
+
         self.task_paths = {
             task: pathlib.Path(task_paths[task]) for task in task_paths.keys()
         }
         self.paths_dict = {key: [] for key in self.task_paths.keys()}
-        self.camera = camera
-        self.camera_index = int(camera[-1])
         self._load_data_paths()
         if TaskEnum.object_detection in self.task_paths.keys():
             self._fetch_projection_matrices()
@@ -88,10 +93,7 @@ class KittiDataset(Dataset):
         Based on the given frame loads a projection matrix.
 
         For object detection loads projection matrix for specific frame,
-        otherwise fetches a "default" projection matrix used in kitti.
-        TODO: Should I always search for a projection matrix even if for that
-        particular frame one does not exist but instead fetch the projection
-        matrix from a frame which is closest?
+        otherwise fetches a "default" projection matrix used in kitti for that date.
 
         Args:
             - frame: Frame name for which a projection matrix is fetched.

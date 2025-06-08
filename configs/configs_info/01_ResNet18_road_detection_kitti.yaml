@@ -25,6 +25,7 @@ epochs: 100
 
 
 model:
+  weights_path: 
   encoder:
     name: ResNet18
     pretrained: True
