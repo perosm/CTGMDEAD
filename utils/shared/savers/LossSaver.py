@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import json
+from collections import defaultdict
 
 from utils.shared.aggregators.LossAggregator import LossAggregator
 from utils.shared.savers.Saver import Saver
@@ -17,8 +18,22 @@ class LossSaver(Saver):
 
     def save(self) -> None:
         task_loss_per_epoch = self.aggregator.return_aggregated()
-        with open(self.save_dir / "losses.json") as f:
+        task_loss_per_epoch = LossSaver._make_it_json_serializable(task_loss_per_epoch)
+        with open(self.save_dir / "losses.json", "w") as f:
             json.dump(task_loss_per_epoch, f)
+
+    @staticmethod
+    def _make_it_json_serializable(
+        task_loss_per_epoch: dict[str, dict[str, torch.Tensor]],
+    ) -> dict[str, dict[str, list[float]]]:
+        task_loss_per_epoch_serializable = defaultdict(dict[str, list])
+        for task in task_loss_per_epoch.keys():
+            for loss in task_loss_per_epoch[task]:
+                task_loss_per_epoch_serializable[task][loss] = task_loss_per_epoch[
+                    task
+                ][loss].tolist()
+
+        return task_loss_per_epoch_serializable
 
     def save_plot(self) -> None:  # TODO: should I make one plot for each of the tasks?
         task_loss_per_epoch = self.aggregator.return_aggregated()

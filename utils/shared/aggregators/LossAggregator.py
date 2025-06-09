@@ -36,7 +36,7 @@ class LossAggregator(Aggregator):
             for loss_name, loss_value in losses.items():
                 self.task_losses_per_epochs[task][loss_name][
                     self.epoch_cnt
-                ] += loss_value.detach().cpu()
+                ] += loss_value.item()
 
         if self.batch_cnt == self.num_batches:
             self._aggregate_per_epoch()

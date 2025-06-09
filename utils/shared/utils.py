@@ -64,11 +64,14 @@ from utils.road_detection.metrics import (
     TrueNegativeRate,
 )
 from utils.object_detection.metrics import mAP
+from utils.object_detection_3d.metrics import mAP_BEV
 from utils.shared.visualizer import Visualizer
 from utils.object_detection.visualizer import Visualizer as ObjectDetectionVisualizer
 from utils.depth.visualizer import Visualizer as DepthVisualizer
 from utils.road_detection.visualizer import Visualizer as RoadVisualizer
 from utils.shared.dict_utils import list_of_dict_to_dict
+
+NUM_CLASSES = 4
 
 
 def prepare_save_directories(args: dict, subfolder_name="train") -> None:
@@ -402,6 +405,7 @@ def configure_metrics(metric_configs):
         # object detection 2D metrics
         mAP.__name__: mAP,
         # object detection 3D metrics
+        mAP_BEV.__name__: mAP_BEV,
     }
     task_metrics = {task: [] for task in metric_configs.keys()}
     for task in metric_configs.keys():
