@@ -61,6 +61,55 @@ def project_3d_boxes_to_image(
     return projections.to(torch.float32)
 
 
+def project_3d_boxes_to_bev(boxes_3d_info: torch.Tensor) -> torch.Tensor:
+    """
+    Extracts the center of the object in camera coordinate system and it's height, width and length,
+    Calculates the eigth vertices of the 3D bounding box and projects it onto the image.
+
+       (5)-----(4)
+       /|       /|       (1)------(0)
+      / |      / |        |        |
+    (6)-----(7)  |  BeV   |        |
+     |  |    |   | -----> |        |
+     | (1)---|--(0)       |        |
+     | /     |  /         |        |
+     |/      | /         (2)------(3)
+    (2)-----(3)
+
+    Args:
+        boxes_3d_info: Bounding boxes in 3D space of shape (num_boxes, 8).
+
+    Returns:
+        Bounding boxes in BeV in the form of (top, left, bottom, right).
+    """
+    num_objects = boxes_3d_info.shape[0]
+    h, w, l = boxes_3d_info[:, 0:3].T
+    x, y, z = boxes_3d_info[:, 3:6].T
+    rotation_y = boxes_3d_info[:, 6]
+    zeros = torch.zeros(num_objects, device=boxes_3d_info.device)
+    ones = torch.ones(num_objects, device=boxes_3d_info.device)
+    R = torch.stack(
+        [
+            torch.stack([torch.cos(rotation_y), zeros, torch.sin(rotation_y)], dim=0),
+            torch.stack([zeros, ones, zeros], dim=0),
+            torch.stack([-torch.sin(rotation_y), zeros, torch.cos(rotation_y)], dim=0),
+        ],
+        dim=0,
+    ).permute(2, 0, 1)
+    x_corners_bottom = torch.stack([l / 2, l / 2, -l / 2, -l / 2], dim=1)
+    y_corners_bottom = torch.stack([zeros, zeros, zeros, zeros], dim=1)
+    z_corners_bottom = torch.stack([w / 2, -w / 2, -w / 2, w / 2], dim=1)
+    bottom_corners = torch.stack(
+        [x_corners_bottom, y_corners_bottom, z_corners_bottom], dim=1
+    )
+    bottom_corners = torch.einsum("nij,njk->nik", R, bottom_corners)
+    bottom_corners[:, 0] += x.unsqueeze(1)
+    bottom_corners[:, 1] += y.unsqueeze(1)
+    bottom_corners[:, 2] += z.unsqueeze(1)
+
+    return torch.stack((bottom_corners[:, 0], bottom_corners[:, 2]), dim=1)
+
+
 def project_3d_points_to_image(
     points_3d: torch.Tensor, projection_matrix: torch.Tensor
 ) -> torch.Tensor:

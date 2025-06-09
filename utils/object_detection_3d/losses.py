@@ -17,12 +17,12 @@ GT_BOX_2D_SLICE = slice(
 
 
 class UncertaintyAwareRegressionLoss(nn.Module):
-    def __init__(self, name: str = "UncertaintyAwareRegressionLoss"):
+    def __init__(self, **kwargs):
         super().__init__()
-        self.name = name
-        self.lambda_H = 1
-        self.lambda_h_rec = 1
-        self.iou_positive_threshold = 0.5
+        self.scale_factor = kwargs.get("scale_factor", 1)
+        self.lambda_H = kwargs.get("lambda_h", 1)
+        self.lambda_h_rec = kwargs.get("lambda_h_rec", 1)
+        self.iou_positive_threshold = kwargs.get("iou_positive_threshold", 1)
         self.register_forward_pre_hook(self._extract_relevant_tensor_info)
 
     @staticmethod
@@ -98,13 +98,13 @@ class UncertaintyAwareRegressionLoss(nn.Module):
         #     + self.lambda_h_rec * pred_log_sigma_h_rec
         # )
 
-        return (L_H + L_h_rec).mean()
+        return self.scale_factor * (L_H + L_h_rec).mean()
 
 
 class L1SizeLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
-        self.lambda_size = 3
+        self.scale_factor = kwargs.get("scale_factor", 1)
         self.register_forward_pre_hook(self._extract_relevant_tensor_info)
 
     @staticmethod
@@ -130,14 +130,15 @@ class L1SizeLoss(nn.Module):
         return pred_size[pos_proposal_indices], gt_size[pos_gt_indices]
 
     def forward(self, pred_size: torch.Tensor, gt_size: torch.Tensor) -> torch.Tensor:
-        return self.lambda_size * F.l1_loss(pred_size, gt_size, reduction="mean")
+        return self.scale_factor * F.l1_loss(pred_size, gt_size, reduction="mean")
 
 
 class L1YawLoss(nn.Module):
-    def __init__(self):
+
+    def __init__(self, **kwargs):
         super().__init__()
         self.register_forward_pre_hook(self._extract_relevant_tensor_info)
-        self.lambda_yaw = 5
+        self.scale_factor = kwargs.get("scale_factor", 1)
 
     @staticmethod
     def _extract_relevant_tensor_info(
@@ -162,13 +163,14 @@ class L1YawLoss(nn.Module):
         return pred_yaw[pos_proposal_indices], gt_yaw[pos_gt_indices]
 
     def forward(self, pred_yaw: torch.Tensor, gt_yaw: torch.Tensor) -> torch.Tensor:
-        return self.lambda_yaw * F.l1_loss(pred_yaw, gt_yaw, reduction="mean")
+        return self.scale_factor * F.l1_loss(pred_yaw, gt_yaw, reduction="mean")
 
 
 class L1KeypointsLoss(nn.Module):
-    def __init__(self):
+
+    def __init__(self, **kwargs):
         super().__init__()
-        self.lambda_keypoints = 5
+        self.scale_factor = kwargs.get("scale_factor", 1)
         self.register_forward_pre_hook(self._extract_relevant_tensor_info)
 
     @staticmethod
@@ -232,6 +234,6 @@ class L1KeypointsLoss(nn.Module):
         pred_normalized_keypoints: torch.Tensor,
         gt_normalized_keypoints: torch.Tensor,
     ) -> torch.Tensor:
-        return F.l1_loss(
+        return self.scale_factor * F.l1_loss(
             pred_normalized_keypoints, gt_normalized_keypoints, reduction="mean"
         )
