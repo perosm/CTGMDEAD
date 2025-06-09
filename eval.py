@@ -19,7 +19,7 @@ from utils.shared.savers.MetricSavers import MetricsSaver
 def eval(args: dict, model: nn.Module, epoch: int | None):
     device = args["device"]
     save_dir = prepare_save_directories(args, "eval")
-    dataset = configure_dataset(args["dataset"])
+    dataset = configure_dataset(args["dataset"], mode="val")
     eval_dataloader = configure_dataloader(args["eval"]["dataloader"], dataset)
 
     prediction_postprocessor = configure_eval_prediction_postprocessor(

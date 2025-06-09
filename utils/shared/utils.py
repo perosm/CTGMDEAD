@@ -26,8 +26,8 @@ from utils.shared.losses import (
     GradLoss,
     MaskedMAE,
     MultiTaskLoss,
-    BinaryCrossEntropyLoss,
 )
+from utils.road_detection.losses import BinaryCrossEntropyLoss
 from utils.object_detection.losses import (
     RPNClassificationAndRegressionLoss,
     RCNNCrossEntropyAndRegressionLoss,
@@ -68,6 +68,7 @@ from utils.shared.visualizer import Visualizer
 from utils.object_detection.visualizer import Visualizer as ObjectDetectionVisualizer
 from utils.depth.visualizer import Visualizer as DepthVisualizer
 from utils.road_detection.visualizer import Visualizer as RoadVisualizer
+from utils.shared.dict_utils import list_of_dict_to_dict
 
 
 def prepare_save_directories(args: dict, subfolder_name="train") -> None:
@@ -80,14 +81,13 @@ def prepare_save_directories(args: dict, subfolder_name="train") -> None:
     return save_dir
 
 
-from utils.shared.dict_utils import list_of_dict_to_dict
-
-
 ############################## CONFIG UTILS ##############################
-def configure_dataset(dataset_configs: dict[str, str | list]) -> Dataset:
+def configure_dataset(dataset_configs: dict[str, str | list], mode: str) -> Dataset:
     dataset_dict = {
         KittiDataset.__name__: KittiDataset(
-            dataset_configs["task_paths"], dataset_configs["task_transform"]
+            dataset_configs["task_paths"],
+            dataset_configs["task_transform"],
+            task_sample_list_path=dataset_configs[f"task_sample_list_path_{mode}"],
         )
     }
     return dataset_dict[dataset_configs["dataset_name"]]
@@ -150,16 +150,16 @@ def configure_model(model_configs: dict, device: torch.device) -> nn.Module:
         road_detection_decoder=road_detection_decoder,
         heads_and_necks=necks_and_heads,
     )
-    _load_model_weights()
+    _load_model_weights(model, model_configs)
     print_model_size(model)
 
     return model
 
 
 def _configure_encoder(encoder_configs: dict) -> nn.Module:
-    encoder_dict = {f"{ResNet.__name__}18": ResNet18(encoder_configs["pretrained"])}
+    encoder_dict = {f"{ResNet.__name__}18": ResNet18}
 
-    return encoder_dict[encoder_configs["name"]]
+    return encoder_dict[encoder_configs["name"]]()
 
 
 def _configure_decoder(decoder_configs: dict) -> nn.Module:
@@ -189,8 +189,40 @@ def _configure_necks_and_heads(
     return FPNFasterRCNN(necks_and_heads_configs)
 
 
-def _load_model_weights():  # TODO:
-    pass
+def _load_model_weights(model: MultiTaskNetwork, model_configs: dict):
+    """
+    Loads model weights using regular expressions.
+    Inside the .yaml files under pretrained_regex we define all the model weights we wish
+    to load from earlier ran models.
+
+    Args:
+        - model_configs: Model configuration information.
+    """
+    weights_file_path = model_configs.pop("weights_file_path", None)
+    if not weights_file_path:
+        return
+
+    model_pretrained_dict = torch.load(weights_file_path)
+    model_dict = model.state_dict()
+    for model_part, part_info in model_configs.items():
+        pretrained_regex_list = part_info.get("pretrained_regex", None)
+        if not pretrained_regex_list:
+            # If the submodule is not pretrained
+            continue
+        for pretrained_regex in pretrained_regex_list:
+            matched_layer_names = [
+                re.match(f"{model_part}.{pretrained_regex}", layer_name).string
+                for layer_name in model_dict.keys()
+                if re.match(f"{model_part}.{pretrained_regex}", layer_name)
+            ]
+            model_dict.update(
+                {
+                    matched_layer_name: model_pretrained_dict[matched_layer_name]
+                    for matched_layer_name in matched_layer_names
+                }
+            )
+
+    model.load_state_dict(model_dict)
 
 
 def print_model_size(model: nn.Module) -> None:
@@ -302,8 +334,11 @@ def configure_loss(loss_configs: dict) -> MultiTaskLoss:
     }
     task_losses = {task: [] for task in loss_configs.keys()}
     for task in loss_configs.keys():
-        for loss_name in loss_configs[task]:
-            task_losses[task].append(loss_dict[loss_name]())
+        for loss_name_args_dict in loss_configs[task]:
+            for loss_name, args_list in loss_name_args_dict.items():
+                task_losses[task].append(
+                    loss_dict[loss_name](**list_of_dict_to_dict(args_list))
+                )
 
     return MultiTaskLoss(task_losses)
 

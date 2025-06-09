@@ -5,6 +5,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 import dataset.kitti.dataset_utils as KITTIutils
 from utils.shared.enums import TaskEnum
+from collections import defaultdict
 
 DELTA_PRINCIPAL_POINT_X = (KITTIutils.KITTI_W - KITTIutils.NEW_W) / 2
 DELTA_PRINCIPAL_POINT_Y = KITTIutils.KITTI_H - KITTIutils.NEW_H
@@ -18,35 +19,43 @@ class KittiDataset(Dataset):
         self,
         task_paths: dict[str, str],
         task_transform: dict[str, list],
-        task_data_split: dict[str, list[str]] = None,
+        task_sample_list_path: dict[str, str] = None,
         camera: str = "image_02",
     ) -> None:
         """
         Args:
-          - task_transforms: dictionary of transforms for each of the network tasks.
-          - camera: string which represents left camera ('02') or right camera ('03')
-          - paths: paths to input data and ground truth for neural networks tasks (e.g. object detection, depth estimation...)
-                   paired with the path to the folder where the ground truth for each of the tasks is stored.
+         - task_transforms: dictionary of transforms for each of the network tasks.
+         - camera: string which represents left camera ('02') or right camera ('03')
+         - paths: paths to input data and ground truth for neural networks tasks (e.g. object detection, depth estimation...)
+                  paired with the path to the folder where the ground truth for each of the tasks is stored.
+         - task_sample_list: List of samples used for that task (used for filtering).
         """
         self.camera = camera
         self.camera_index = int(camera[-1])
         self.ground_truth_path_to_projection_matrices = {}
-
+        self.paths_dict = defaultdict(list)
+        self.task_sample_list = self._read_sample_lists(task_sample_list_path)
+        self.task_root_dir_path = {
+            task: pathlib.Path(task_paths[task]) for task in task_paths.keys()
+        }
         self.task_transform = self._configure_transforms(
             KITTIutils.task_tranform_mapping(task_transform)
         )
-        if task_data_split:
-            pass
-
-        self.task_paths = {
-            task: pathlib.Path(task_paths[task]) for task in task_paths.keys()
-        }
-        self.paths_dict = {key: [] for key in self.task_paths.keys()}
         self._load_data_paths()
-        if TaskEnum.object_detection in self.task_paths.keys():
+        if TaskEnum.object_detection in self.task_root_dir_path.keys():
             self._fetch_projection_matrices()
         self._filter_data_paths()
         self.load_functions = KITTIutils.load_utils(list(self.paths_dict.keys()))
+
+    def _read_sample_lists(self, task_sample_list_path: dict[str, str]):
+        task_sample_list = defaultdict(set)
+        for task, sample_list_path in task_sample_list_path.items():
+            with open(sample_list_path, "r") as file:
+                lines = file.readlines()
+                for line in lines:
+                    task_sample_list[task].add(line.strip())
+
+        return task_sample_list
 
     def _configure_transforms(
         self, task_transform: dict
@@ -132,8 +141,8 @@ class KittiDataset(Dataset):
         return projection_matrix
 
     def _load_data_paths(self) -> None:
-        for task in self.task_paths.keys():
-            for root_path, _, files in self.task_paths[task].walk():
+        for task in self.task_root_dir_path.keys():
+            for root_path, _, files in self.task_root_dir_path[task].walk():
                 if self.camera in str(root_path):  # for input and depth
                     self.paths_dict[task].extend(
                         root_path / file
@@ -144,29 +153,25 @@ class KittiDataset(Dataset):
             self.paths_dict[task] = sorted(self.paths_dict[task])
 
     def _filter_data_paths(self):
-        task_root_paths = {
-            task: self.task_paths[task].absolute() for task in self.task_paths.keys()
+        task_absolute_root_paths = {
+            task: self.task_root_dir_path[task].absolute()
+            for task in self.task_root_dir_path.keys()
         }
         task_extension = {
-            task: self.paths_dict[task][0].suffix for task in self.task_paths.keys()
+            task: self.paths_dict[task][0].suffix
+            for task in self.task_root_dir_path.keys()
         }
-        task_unique_data = {task: set() for task in self.task_paths.keys()}
-        for task, paths in self.paths_dict.items():
-            for path in paths:
-                task_unique_data[task].add(
-                    "/".join(
-                        path.with_suffix("").parts[self.UNIQUE_PATH_PARTS_NUMBER :]
-                    )
-                )
-
-        final_paths = task_unique_data[KITTIutils.TaskEnum.input]
-        for task, unique_data in task_unique_data.items():
+        final_paths = set(
+            "/".join(path.with_suffix("").parts[self.UNIQUE_PATH_PARTS_NUMBER :])
+            for path in self.paths_dict[KITTIutils.TaskEnum.input]
+        )
+        for task, unique_data in self.task_sample_list.items():
             final_paths = final_paths.intersection(unique_data)
 
-        for task in task_root_paths.keys():
+        for task in task_absolute_root_paths.keys():
             self.paths_dict[task] = sorted(
                 [
-                    task_root_paths[task] / f"{path}{task_extension[task]}"
+                    task_absolute_root_paths[task] / f"{path}{task_extension[task]}"
                     for path in final_paths
                 ]
             )

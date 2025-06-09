@@ -30,6 +30,9 @@ def main():
 
         configs_ran.append(config_numbers.pop(0))
         _write_configs_txt_file(
+            args.configs_dir_path / CONFIG_NUMBERS_TXT, config_numbers
+        )
+        _write_configs_txt_file(
             args.configs_dir_path / CONFIG_NUMBERS_TRACK_RAN_TXT, configs_ran
         )
         flag = len(config_numbers) != 0
@@ -61,7 +64,7 @@ def _parse_args() -> argparse.Namespace:
 
 def _read_configs_txt_file(filepath: pathlib.Path) -> list[str]:
     with open(filepath) as f:
-        return f.readlines()
+        return [line.strip() for line in f.readlines()]
 
 
 def _find_configs_yaml_file(
@@ -85,7 +88,7 @@ def _load_yaml_file(yaml_file: pathlib.Path) -> dict:
 
 def _write_configs_txt_file(path_to_file: pathlib.Path, lines: list[str]) -> None:
     with open(path_to_file, "w") as f:
-        f.writelines(lines)
+        f.writelines(f"{line}\n" for line in lines)
 
 
 if __name__ == "__main__":

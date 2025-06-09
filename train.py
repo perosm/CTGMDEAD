@@ -29,7 +29,7 @@ def train(args: dict):
     )
 
     device = args["device"]
-    dataset = configure_dataset(args["dataset"])
+    dataset = configure_dataset(args["dataset"], mode="train")
     train_dataloader = configure_dataloader(args["train"]["dataloader"], dataset)
 
     model = configure_model(args["model"], device).to(device)
@@ -47,7 +47,6 @@ def train(args: dict):
         freeze_model(model, args["model"], epoch)
         # plot_projected_height(data)
         data = move_data_to_gpu(data)
-        # plot_task_gt(data)
         pred = model(data["input"])
         loss, per_batch_task_losses = losses(pred, data)
         loss.backward()
@@ -58,7 +57,7 @@ def train(args: dict):
             logging.INFO,
             f"epoch: {epoch}; loss: {loss.item()}, per_batch_task_losses: {per_batch_task_losses}",
         )
-        if epoch % 100 == 0 and epoch != 0:
+        if epoch % 10 == 0 and epoch != 0:
             print(f"Epoch: {epoch}")
             eval.eval(args, model, epoch)
             model.train()

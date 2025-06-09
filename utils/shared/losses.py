@@ -3,6 +3,8 @@ from torch import nn
 import torch.nn.functional as F
 from collections import defaultdict
 
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
 
 class MultiTaskLoss(nn.Module):
     def __init__(self, task_losses: dict[str, list[nn.Module]]):
@@ -27,36 +29,34 @@ class MultiTaskLoss(nn.Module):
 
 
 class MaskedMAE(nn.Module):
-    def __init__(self, name: str = "MaskedMAE", device: str = "cuda"):
+    def __init__(self, **kwargs):
         super().__init__()
-        self.name = name
+        self.lambda_factor = kwargs.get("lambda_factor", 1.0)
         self._l1_loss = nn.L1Loss(reduction="none")
-        self.device = device
 
     def forward(self, pred, gt):
-        mask = torch.where(gt != 0, 1, 0).to(self.device)
+        mask = torch.where(gt != 0, 1, 0).to(DEVICE)
         valid_points = mask.sum()
         loss = self._l1_loss(pred * mask, gt).sum((2, 3)) / valid_points
         return loss.mean()
 
 
 class GradLoss(nn.Module):
-    def __init__(self, name: str = "GradLoss", device: str = "cuda"):
+    def __init__(self):
         super().__init__()
-        self.name = name
         sobel_x = (
             torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32)
             .unsqueeze(0)
             .unsqueeze(0)
-        ).to(device)
+        ).to(DEVICE)
         sobel_y = (
             torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=torch.float32)
             .unsqueeze(0)
             .unsqueeze(0)
-        ).to(device)
+        ).to(DEVICE)
 
-        self.conv_x = nn.Conv2d(1, 1, kernel_size=3, padding=1, bias=False).to(device)
-        self.conv_y = nn.Conv2d(1, 1, kernel_size=3, padding=1, bias=False).to(device)
+        self.conv_x = nn.Conv2d(1, 1, kernel_size=3, padding=1, bias=False).to(DEVICE)
+        self.conv_y = nn.Conv2d(1, 1, kernel_size=3, padding=1, bias=False).to(DEVICE)
 
         self.conv_x.weight = nn.Parameter(sobel_x, requires_grad=False)
         self.conv_y.weight = nn.Parameter(sobel_y, requires_grad=False)
@@ -73,14 +73,3 @@ class GradLoss(nn.Module):
         loss = F.l1_loss(grad_pred, grad_gt)
 
         return loss
-
-
-class BinaryCrossEntropyLoss(nn.Module):
-
-    def __init__(self, name: str = "BinaryCrossEntropyLoss"):
-        super().__init__()
-        self.name = name
-        self.loss = nn.BCELoss(reduction="mean")
-
-    def forward(self, pred, gt):
-        return self.loss(pred, gt)

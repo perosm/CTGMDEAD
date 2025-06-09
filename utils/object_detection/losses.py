@@ -6,15 +6,14 @@ from utils.shared.enums import ObjectDetectionEnum
 
 
 class RPNClassificationAndRegressionLoss(nn.Module):
-    def __init__(self, regularization_factor: float = 10.0) -> None:
+    def __init__(self, **kwargs) -> None:
         super().__init__()
-        self.name = "RPNClassificationAndRegressionLoss"
-        self.n_cls = 256
-        self.positives_ratio = 0.25
+        self.n_cls = kwargs.get("n_cls", 256)
+        self.positives_ratio = kwargs.get("positives_ratio", 0.2)
         self.negatives_ratio = 1 - self.positives_ratio
-        self.iou_negative_threshold = 0.3
-        self.iou_positive_threshold = 0.7
-        self.regularization_factor = 10.0
+        self.iou_negative_threshold = kwargs.get("iou_negative_threshold", 0.3)
+        self.iou_positive_threshold = kwargs.get("iou_positive_threshold", 0.7)
+        self.regularization_factor = kwargs.get("regularization_factor", 0.7)
         positive_weight = torch.FloatTensor(
             [self.negatives_ratio / self.positives_ratio]
         ).cuda()
@@ -138,16 +137,15 @@ class RPNClassificationAndRegressionLoss(nn.Module):
 
 
 class RCNNCrossEntropyAndRegressionLoss(nn.Module):
-    def __init__(self, name: str = "RCNNCrossEntropyAndRegressionLoss"):
+    def __init__(self, **kwargs):
         super().__init__()
-        self.name = name
-        self.positives_ratio = 0.25
+        self.positives_ratio = kwargs.get("positives_ratio", 0.2)
         self.negatives_ratio = 1 - self.positives_ratio
-        self.iou_positive_threshold = 0.5
-        self.iou_negative_threshold = 0.2
-        self.n_cls = 256
-        self.num_classes = 4
-        self.regularization_factor = 10.0
+        self.iou_negative_threshold = kwargs.get("iou_negative_threshold", 0.2)
+        self.iou_positive_threshold = kwargs.get("iou_positive_threshold", 0.5)
+        self.n_cls = kwargs.get("n_cls", 256)
+        self.num_classes = kwargs.get("num_classes", 4)
+        self.regularization_factor = kwargs.get("regularization_factor", 10.0)
         negative_weight = self.negatives_ratio / self.negatives_ratio
         positive_weight = self.negatives_ratio / self.positives_ratio
         class_weights = torch.FloatTensor(

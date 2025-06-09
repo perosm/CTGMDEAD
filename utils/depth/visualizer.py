@@ -15,4 +15,4 @@ class Visualizer(VisualizerStrategy):
         self, pred: torch.Tensor, gt: torch.Tensor, image: torch.Tensor
     ) -> dict[str, np.ndarray]:
 
-        return {self.task: pred.permute(1, 2, 0).numpy().squeeze().astype(np.uint8)}
+        return {self.task: pred.numpy().squeeze().astype(np.uint8)}
