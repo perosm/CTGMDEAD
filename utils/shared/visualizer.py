@@ -4,7 +4,7 @@ import pathlib
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from datetime import datetime
+from utils.shared.enums import TaskEnum
 
 
 class VisualizerStrategy(abc.ABC):
@@ -31,7 +31,13 @@ class Visualizer:
     def plot_visualizations(
         self, pred: torch.Tensor, gt: torch.Tensor, image: torch.Tensor
     ):
-        data_to_plot = {}
+        data_to_plot = {
+            TaskEnum.input: image.squeeze(0)
+            .cpu()
+            .permute(1, 2, 0)
+            .numpy()
+            .astype(np.uint8)
+        }
         for task in self.visualizers:
             data_to_plot.update(
                 {
@@ -53,6 +59,7 @@ class Visualizer:
 
         if num_subplots == 1:
             axes = [axes]
+
         for ax, (task, plot_data) in zip(axes, data_to_plot.items()):
             ax.imshow(plot_data)
             ax.set_title(task)

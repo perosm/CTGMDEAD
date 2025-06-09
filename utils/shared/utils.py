@@ -254,9 +254,11 @@ def freeze_model(model: MultiTaskNetwork, model_configs: dict, epoch: int = 0) -
     }
 
     for submodule_name, submodule in submodules_dict.items():
-        submodule_config = list_of_dict_to_dict(
-            model_configs.get(submodule_name, {}), {}, 1
-        )
+        submodule_config = model_configs.get(submodule_name, {})
+
+        if isinstance(submodule_config, list):
+            submodule_config = list_of_dict_to_dict(submodule_config)
+
         if submodule:
             if submodule_config.get("freeze_epoch") == epoch:
                 freeze_params(submodule, freeze=True)

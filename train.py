@@ -45,7 +45,6 @@ def train(args: dict):
     data = next(iter(train_dataloader))
     for epoch in tqdm(range(epochs), "Training..."):
         freeze_model(model, args["model"], epoch)
-        # plot_projected_height(data)
         data = move_data_to_gpu(data)
         pred = model(data["input"])
         loss, per_batch_task_losses = losses(pred, data)
@@ -57,7 +56,7 @@ def train(args: dict):
             logging.INFO,
             f"epoch: {epoch}; loss: {loss.item()}, per_batch_task_losses: {per_batch_task_losses}",
         )
-        if epoch % 10 == 0 and epoch != 0:
+        if epoch % 50 == 0:
             print(f"Epoch: {epoch}")
             eval.eval(args, model, epoch)
             model.train()

@@ -14,6 +14,7 @@ dataset:
     depth: "./data/kitti/depth" # for visualization purposes
     road_detection: "./data/kitti/semantic_segmentation"
   task_sample_list_path_train:
+    depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
     road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
   task_sample_list_path_val:
     road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"

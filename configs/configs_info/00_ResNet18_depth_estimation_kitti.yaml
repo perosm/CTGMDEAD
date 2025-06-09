@@ -12,8 +12,10 @@ dataset:
     depth: "./data/kitti/depth"
   task_sample_list_path_train:
     depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
+    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
   task_sample_list_path_val:
-    depth: "./data/kitti/sample_lists/val/depth_sample_list.txt"
+    depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
+    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
 
 train:
   dataloader:
@@ -32,8 +34,8 @@ model:
   encoder:
     name: ResNet18
     pretrained: True
-    freeze_epoch: 0
-    unfreeze_epoch: 10
+    freeze_epoch: -1
+    unfreeze_epoch: 0
   depth_decoder:
     name: UnetDepthDecoder
     in_channels: 512
