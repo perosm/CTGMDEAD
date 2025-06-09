@@ -24,6 +24,10 @@ class PredictionPostprocessor(nn.Module):
         focal_x = projection_matrix[0, 0]
         num_objects = bounding_boxes_2d.shape[0]
 
+        if distance_head_output.shape[0] == 0:
+            # No objects were predicted
+            return torch.zeros((0, 7)).to(distance_head_output.device)
+
         # Fetch distance head information
         H, _, h_rec, _ = distance_head_output.unbind(dim=-1)
         distance = focal_x * H * h_rec
@@ -66,10 +70,10 @@ class PredictionPostprocessor(nn.Module):
 
         return torch.cat(
             [
-                labels.unsqueeze(-1),
-                class_probits.unsqueeze(-1),
-                bounding_boxes_2d,
-                bounding_boxes_3d,
+                labels.unsqueeze(-1),  # 0
+                class_probits.unsqueeze(-1),  # 1
+                bounding_boxes_2d,  # 2, 3, 4, 5
+                bounding_boxes_3d,  # 6, 7, 8, 9, 10, 11, 12
             ],
             dim=-1,
         )

@@ -4,7 +4,10 @@ import cv2
 
 from utils.shared.visualizer import VisualizerStrategy
 from utils.shared.enums import TaskEnum
-from utils.object_detection_3d.utils import project_3d_boxes_to_image
+from utils.object_detection_3d.utils import (
+    project_3d_boxes_to_image,
+    project_3d_boxes_to_bev,
+)
 from utils.shared.enums import ObjectDetectionEnum
 from torchvision.utils import draw_bounding_boxes
 
@@ -36,23 +39,33 @@ class Visualizer(VisualizerStrategy):
         image: torch.Tensor,
     ) -> dict[str, np.ndarray]:
         gt_info = gt["gt_info"].squeeze(0).cpu()
-        image_od_2d = self.visualize_2d(
+        image_od_2d = self._visualize_2d(
             pred=pred[:, self.pred_box_info_2d_slice].to(torch.int64),
             gt=gt_info[:, self.gt_bounding_box_2d_slice].to(torch.int64),
             image=image.clone().to(torch.uint8),
         )
 
         projection_matrix = gt["projection_matrix"].squeeze(0).cpu()
-        image_od_3d = self.visualize_3d(
+        image_od_3d = self._visualize_3d(
             pred=pred[:, self.pred_bounding_box_3d_slice],
             gt=gt_info[:, self.gt_bounding_box_3d_slice],
             image=image.clone().permute(1, 2, 0).numpy().astype(np.uint8),
             projection_matrix=projection_matrix,
         )
 
-        return {f"{self.task}_2d": image_od_2d, f"{self.task}_3d": image_od_3d}
+        image_od_3d_bev = self._visualize_3d_bev(
+            pred=pred[:, self.pred_bounding_box_3d_slice],
+            gt=gt_info[:, self.gt_bounding_box_3d_slice],
+            image_shape=image.shape,
+        )
 
-    def visualize_2d(
+        return {
+            f"{self.task}_2d": image_od_2d,
+            f"{self.task}_3d": image_od_3d,
+            f"{self.task}_bev": image_od_3d_bev,
+        }
+
+    def _visualize_2d(
         self, pred: torch.Tensor, gt: torch.Tensor, image: torch.Tensor
     ) -> np.ndarray:
         labels = pred[:, 0]
@@ -72,7 +85,7 @@ class Visualizer(VisualizerStrategy):
 
         return image.permute(1, 2, 0).numpy()
 
-    def visualize_3d(
+    def _visualize_3d(
         self,
         pred: np.ndarray,
         gt: np.ndarray,
@@ -104,8 +117,8 @@ class Visualizer(VisualizerStrategy):
             .astype(np.int32)
         )
 
-        print("Pred: ", pred)
-        print("Gt:", gt)
+        # print("Pred: ", pred)
+        # print("Gt:", gt)
         for projected_pred_box in projected_pred_boxes:
             Visualizer.draw_3d_box(
                 image=image, box_3d=projected_pred_box, color=(255, 0, 0)
@@ -117,6 +130,50 @@ class Visualizer(VisualizerStrategy):
             end_point = tuple(projected_height[2:].tolist())
             cv2.line(image, start_point, end_point, color=(0, 255, 0), thickness=1)
 
+        return image
+
+    def _visualize_3d_bev(
+        self, pred: torch.Tensor, gt: torch.Tensor, image_shape: tuple[int, int]
+    ) -> np.ndarray:
+        C, H, W = image_shape
+        image = np.zeros((H, W, C))  # (80, 90))
+        pred_boxes_bev = project_3d_boxes_to_bev(boxes_3d_info=pred).numpy()
+        gt_boxes_bev = project_3d_boxes_to_bev(boxes_3d_info=gt).numpy()
+
+        def to_pixel(x: np.ndarray, z: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            """
+            ________z (u)
+            |
+            |
+            |
+            x (v)
+
+            z coordinate corresponds to
+            """
+
+            # x: [-40, 40] -> [0, 80]
+            v = (((x + 40) / 80.0) * (H - 1)).astype(np.int32)
+            # z: [0, 90]
+            u = ((z / 90.0) * W).astype(np.int32)
+            v = np.clip(v, 0, H)
+            u = np.clip(u, 0, W)
+
+            return u, v
+
+        pred_u, pred_v = to_pixel(pred_boxes_bev[:, 0], pred_boxes_bev[:, 1])
+        gt_u, gt_v = to_pixel(gt_boxes_bev[:, 0], gt_boxes_bev[:, 1])
+
+        for box_corners in np.stack((pred_u, pred_v), axis=-1):
+            box_corners = box_corners.reshape(-1, 1, 2)
+            cv2.polylines(
+                image, [box_corners], isClosed=True, color=(255, 0, 0), thickness=1
+            )
+
+        for box_corners in np.stack((gt_u, gt_v), axis=-1):
+            box_corners = box_corners.reshape(-1, 1, 2)
+            cv2.polylines(
+                image, [box_corners], isClosed=True, color=(0, 255, 0), thickness=1
+            )
         return image
 
     @staticmethod
