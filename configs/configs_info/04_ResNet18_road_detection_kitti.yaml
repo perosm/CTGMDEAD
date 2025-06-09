@@ -7,13 +7,17 @@ dataset:
       - Crop
     depth:
       - Crop
+    road_detection:
+      - Crop
   task_paths:
     input: "./data/kitti/input"
-    depth: "./data/kitti/depth"
+    depth: "./data/kitti/depth" # for visualization purposes
+    road_detection: "./data/kitti/semantic_segmentation"
   task_sample_list_path_train:
-    depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
+    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
   task_sample_list_path_val:
-    depth: "./data/kitti/sample_lists/val/depth_sample_list.txt"
+    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
+    depth: "./data/kitti/sample_lists/train/depth_sample_list.txt" # for visualization purposes
 
 train:
   dataloader:
@@ -28,14 +32,19 @@ train:
 epochs: 201
 
 model:
-  weights_file_path:
   encoder:
     name: ResNet18
-    pretrained: True
     freeze_epoch: 0
-    unfreeze_epoch: 10
+    unfreeze_epoch: -1
   depth_decoder:
     name: UnetDepthDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    freeze_epoch: 0
+    unfreeze_epoch: -1
+  road_detection_decoder:
+    name: UnetRoadDetectionDecoder
     in_channels: 512
     channel_scale_factors: [2, 4, 8, 8]
     out_channels: 1
@@ -46,15 +55,17 @@ prediction_postprocess: # used only in eval
   - depth:
     - min_depth: 0.0
     - max_depth: 90.0
+  - road_detection: # None
 
 loss:
-  depth: 
-    - MaskedMAE:
-      - scale_factor: 1.0
+  road_detection:
+    - BinaryCrossEntropyLoss:
+      - lambda_factor: 1.0
 
 optimizer:
   name: Adam
   lr: 1e-4
+
 
 eval:
   dataloader:
@@ -62,9 +73,13 @@ eval:
     shuffle: False
     num_workers: 1
 
-
 metrics:
-  depth:
-    - MaskedMAE
+  road_detection:
+    - IoU
+    - Precision
+    - Recall
+    - FalsePositiveRate
+    - TrueNegativeRate
+    - F1Score
 
 save_path: ../run_info/
