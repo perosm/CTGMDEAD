@@ -3,6 +3,8 @@ from torch import nn
 
 
 class IoU(nn.Module):
+    higher = True
+
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
@@ -18,6 +20,8 @@ class IoU(nn.Module):
 
 
 class Precision(nn.Module):
+    higher = True
+
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
@@ -33,6 +37,8 @@ class Precision(nn.Module):
 
 
 class Recall(nn.Module):
+    higher = True
+
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
@@ -48,6 +54,8 @@ class Recall(nn.Module):
 
 
 class FalsePositiveRate(nn.Module):
+    higher = False
+
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
@@ -63,6 +71,8 @@ class FalsePositiveRate(nn.Module):
 
 
 class TrueNegativeRate(nn.Module):
+    higher = True
+
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
@@ -78,6 +88,7 @@ class TrueNegativeRate(nn.Module):
 
 
 class F1Score(nn.Module):
+    higher = True
 
     def __init__(self):
         super().__init__()

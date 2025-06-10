@@ -11,6 +11,8 @@ PRED_BOUNDING_BOX_3D_SLICE = slice(6, None)
 
 
 class mAP_BEV(nn.Module):
+    higher = True
+
     def __init__(self):
         super().__init__()
         self.eval()

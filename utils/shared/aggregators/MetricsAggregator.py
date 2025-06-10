@@ -9,15 +9,12 @@ class MetricsAggregator(Aggregator):
         self,
         task_metrics: dict[str, list[nn.Module]],
         num_batches: int,
-        device: str = "cuda",
+        device: str = "cpu",
     ):
         self.batch_cnt = 0
         self.num_batches = num_batches
         self.task_metrics_per_epochs: dict[str, dict[str, list[float]]] = {
-            task: {
-                metric.__class__.__name__: torch.zeros(1).to(device)
-                for metric in task_metrics[task]
-            }
+            task: {metric.__class__.__name__: 0.0 for metric in task_metrics[task]}
             for task in task_metrics.keys()
         }
 
@@ -27,7 +24,7 @@ class MetricsAggregator(Aggregator):
         self.batch_cnt += 1
         for task, metrics in per_batch_values.items():
             for metric_name, metric_value in metrics.items():
-                self.task_metrics_per_epochs[task][metric_name] += metric_value.detach()
+                self.task_metrics_per_epochs[task][metric_name] += metric_value.item()
 
         if self.batch_cnt == self.num_batches:
             self._aggregate_per_epoch()
@@ -37,7 +34,7 @@ class MetricsAggregator(Aggregator):
             for metric_name, _ in metrics.items():
                 self.task_metrics_per_epochs[task][metric_name] = (
                     self.task_metrics_per_epochs[task][metric_name] / self.num_batches
-                ).item()
+                )
 
     def return_aggregated(self) -> dict[str, dict[str, torch.Tensor]]:
         return self.task_metrics_per_epochs

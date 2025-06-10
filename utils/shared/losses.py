@@ -29,6 +29,8 @@ class MultiTaskLoss(nn.Module):
 
 
 class MaskedMAE(nn.Module):
+    higher = False
+
     def __init__(self, **kwargs):
         super().__init__()
         self.lambda_factor = kwargs.get("lambda_factor", 1.0)

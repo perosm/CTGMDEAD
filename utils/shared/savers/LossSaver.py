@@ -11,7 +11,11 @@ from utils.shared.savers.Saver import Saver
 
 class LossSaver(Saver):
     def __init__(
-        self, loss_aggregator: LossAggregator, save_dir: pathlib.Path, device="cuda"
+        self,
+        loss_aggregator: LossAggregator,
+        save_dir: pathlib.Path,
+        mode: str = "train",
+        device="cpu",
     ):
         super().__init__(loss_aggregator, save_dir)
         self.device = device

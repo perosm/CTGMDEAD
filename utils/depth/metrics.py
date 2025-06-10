@@ -8,12 +8,13 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class MaskedAverageRelativeError(nn.Module):
+    # used for picking N worst frames
+    # lower MaskedAverageRelative = better -> False
+    higher = False
+
     def __init__(self):
-        super().__init__()
-        # used for picking N worst frames
-        # lower MaskedAverageRelative = better -> False
-        self.higher = False
         self.eval()
+        super().__init__()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         mask = torch.where(gt != 0, 1, 0).to(DEVICE)
@@ -27,11 +28,12 @@ class MaskedAverageRelativeError(nn.Module):
 
 
 class MaskedRMSE(nn.Module):
+    # used for picking N worst frames
+    # lower MaskedRMSE = better -> False
+    higher = False
+
     def __init__(self):
         super().__init__()
-        # used for picking N worst frames
-        # lower MaskedRMSE = better -> False
-        self.higher = False
         self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
@@ -45,11 +47,12 @@ class MaskedRMSE(nn.Module):
 
 
 class MaskedThresholdAccracy(nn.Module):
+    # used for picking N worst frames
+    # higher MaskedThresholdAcuraccy = better -> True
+    higher = True
+
     def __init__(self, threshold: float = 1.25):
         super().__init__()
-        # used for picking N worst frames
-        # higher MaskedThresholdAcuraccy = better -> True
-        self.higher = True
         self.threshold = threshold
         self.eval()
 
@@ -69,11 +72,12 @@ class MaskedThresholdAccracy(nn.Module):
 
 
 class MaskedMeanAbsoluteError(nn.Module):
+    # used for picking N worst frames
+    # lower MaskedMAE = better -> False
+    higher = False
+
     def __init__(self):
         super().__init__()
-        # used for picking N worst frames
-        # lower MaskedMAE = better -> False
-        self.higher = False
         self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:

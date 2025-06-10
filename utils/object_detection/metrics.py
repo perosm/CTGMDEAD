@@ -9,6 +9,8 @@ IOU_THRESHOLD = 0.5
 
 
 class mAP(nn.Module):
+    higher = True
+
     def __init__(self):
         super().__init__()
         self.eval()
