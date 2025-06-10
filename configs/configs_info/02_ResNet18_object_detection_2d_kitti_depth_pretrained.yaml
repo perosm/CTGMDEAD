@@ -9,7 +9,7 @@ dataset:
     input: "./data/kitti/input"
     object_detection: "./data/kitti/object_detection/ground_truth"
   task_sample_list_path_train:
-    object_detection: "./data/kitti/sample_lists/val/objdet_sample_list.txt"
+    object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"
   task_sample_list_path_val:
     object_detection: "./data/kitti/sample_lists/val/objdet_sample_list.txt"
 

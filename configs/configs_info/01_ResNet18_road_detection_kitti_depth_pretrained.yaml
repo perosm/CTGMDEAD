@@ -22,7 +22,7 @@ dataset:
 
 train:
   dataloader:
-    batch_size: 2
+    batch_size: 32
     shuffle: True
     num_workers: 1
 

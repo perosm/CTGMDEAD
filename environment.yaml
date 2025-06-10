@@ -1,9 +1,9 @@
 name: mt
 channels:
-  - conda-forge
   - anaconda
   - nvidia
   - pytorch
+  - conda-forge
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=main
@@ -12,9 +12,9 @@ dependencies:
   - brotli-python=1.0.9=py312h6a678d5_8
   - bzip2=1.0.8=h5eee18b_6
   - c-ares=1.19.1=h5eee18b_0
-  - ca-certificates=2024.12.31=h06a4308_0
+  - ca-certificates=2025.4.26=hbd8a1cb_0
   - cairo=1.16.0=hb05425b_5
-  - certifi=2024.12.14=py312h06a4308_0
+  - certifi=2025.4.26=pyhd8ed1ab_0
   - charset-normalizer=3.3.2=pyhd3eb1b0_0
   - colorama=0.4.6=py312h06a4308_0
   - contourpy=1.3.1=py312hdb19cb5_0
@@ -103,6 +103,7 @@ dependencies:
   - libxcb=1.15=h7f8727e_0
   - libxkbcommon=1.0.1=h097e994_2
   - libxml2=2.13.5=hfdd30dd_0
+  - lightning-utilities=0.14.3=pyhd8ed1ab_0
   - llvm-openmp=14.0.6=h9e868ea_0
   - lz4-c=1.9.4=h6a678d5_1
   - markupsafe=2.1.3=py312h5eee18b_0
@@ -124,7 +125,7 @@ dependencies:
   - openh264=2.1.1=h4ff587b_0
   - openjpeg=2.5.2=he7f1fd0_0
   - openldap=2.6.4=h42fbc30_0
-  - openssl=3.0.15=h5eee18b_0
+  - openssl=3.0.16=h5eee18b_0
   - packaging=24.2=py312h06a4308_0
   - pcre2=10.42=hebb0a14_1
   - pillow=11.0.0=py312hcea889d_1
@@ -152,6 +153,7 @@ dependencies:
   - tbb=2021.8.0=hdb19cb5_0
   - tk=8.6.14=h39e8969_0
   - torchaudio=2.5.1=py312_cu124
+  - torchmetrics=1.7.1=pyhd8ed1ab_0
   - torchtriton=3.1.0=py312
   - torchvision=0.20.1=py312_cu124
   - tornado=6.4.2=py312h5eee18b_0
