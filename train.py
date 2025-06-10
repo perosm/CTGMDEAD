@@ -5,7 +5,8 @@ import eval
 from tqdm import tqdm
 from utils.shared.aggregators.LossAggregator import LossAggregator
 from utils.shared.savers.LossSaver import LossSaver
-
+from utils.shared.early_stopping import EarlyStopping
+from utils.shared.model_saver import ModelSaver
 
 from utils.shared.utils import (
     prepare_save_directories,
@@ -17,15 +18,18 @@ from utils.shared.utils import (
     configure_loss,
     configure_logger,
     move_data_to_gpu,
+    configure_metrics,
 )
 
 
 def train(args: dict):
+    # train specific stuff
     logger = logging.getLogger(__name__)
-    save_dir = prepare_save_directories(args, "train")
-    logger = configure_logger(save_dir=save_dir, module_name=__name__)
+    train_save_dir = prepare_save_directories(args, "train")
+    val_save_dir = prepare_save_directories(args, "eval")
+    logger = configure_logger(save_dir=train_save_dir, module_name=__name__)
     logging.basicConfig(
-        filename=save_dir / "train.log", encoding="utf-8", level=logging.INFO
+        filename=train_save_dir / "train.log", encoding="utf-8", level=logging.INFO
     )
 
     device = args["device"]
@@ -36,32 +40,52 @@ def train(args: dict):
     losses = configure_loss(args["loss"])
     optimizer = configure_optimizer(model, args["optimizer"])
     epochs = args["epochs"]
-    model.train()
     loss_aggregator = LossAggregator(
-        task_losses=losses.task_losses, epochs=epochs, num_batches=1, device=device
+        task_losses=losses.task_losses,
+        epochs=epochs,
+        num_batches=len(train_dataloader),
+        device=device,
     )
-    loss_saver = LossSaver(loss_aggregator=loss_aggregator, save_dir=save_dir)
-
-    data = next(iter(train_dataloader))
-    for epoch in tqdm(range(epochs), "Training..."):
+    loss_saver = LossSaver(
+        loss_aggregator=loss_aggregator, save_dir=train_save_dir, device=device
+    )
+    early_stopping = EarlyStopping(**args["early_stopping"])
+    # val specific stuff
+    model_saver = ModelSaver(
+        save_dir=val_save_dir.parent,
+        task_metrics=configure_metrics(args["metrics"]).task_metrics,
+    )
+    val_loss_aggregator = LossAggregator(
+        task_losses=losses.task_losses,
+        epochs=epochs,
+        num_batches=1,  # will be set to len(val_dataloader)
+        device="cpu",
+    )
+    val_loss_saver = LossSaver(
+        loss_aggregator=val_loss_aggregator, save_dir=val_save_dir
+    )
+    for epoch in tqdm(range(epochs), f"Training..."):
+        model.train()
         freeze_model(model, args["model"], epoch)
-        data = move_data_to_gpu(data)
-        pred = model(data["input"])
-        loss, per_batch_task_losses = losses(pred, data)
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-        loss_aggregator.aggregate_per_batch(per_batch_task_losses)
+        for data in tqdm(train_dataloader, f"Epoch: {epoch}"):
+            data = move_data_to_gpu(data)
+            pred = model(data["input"])
+            loss, per_batch_task_losses = losses(pred, data)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            loss_aggregator.aggregate_per_batch(per_batch_task_losses)
+
         logger.log(
             logging.INFO,
-            f"epoch: {epoch}; loss: {loss.item()}, per_batch_task_losses: {per_batch_task_losses}",
+            f"epoch {epoch}: loss={loss_aggregator.loss_per_epochs[epoch].item()}",
         )
-        if epoch % 50 == 0:
-            print(f"Epoch: {epoch}")
-            eval.eval(args, model, epoch)
-            model.train()
+        eval.eval(args, model, epoch, early_stopping, val_loss_aggregator, model_saver)
+        if early_stopping.early_stop:
+            logger.log(logging.INFO, f"Early stopping at epoch {epoch}!")
+            break
 
+    loss_saver.save()
     loss_saver.save_plot()
-    torch.save(model.state_dict(), save_dir / "model.pth")
-
-    return
+    val_loss_saver.save()
+    val_loss_saver.save_plot()
