@@ -5,35 +5,35 @@ dataset:
   task_transform:
     input: 
       - Crop
-    depth:
-      - Crop
+    # depth:
+    #   - Crop
     road_detection:
       - Crop
   task_paths:
     input: "./data/kitti/input"
-    depth: "./data/kitti/depth" # for visualization purposes
+    # depth: "./data/kitti/depth" # for visualization purposes
     road_detection: "./data/kitti/semantic_segmentation"
   task_sample_list_path_train:
-    depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
+    # depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
     road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
   task_sample_list_path_val:
-    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
-    depth: "./data/kitti/sample_lists/train/depth_sample_list.txt" # for visualization purposes
+    road_detection: "./data/kitti/sample_lists/val/semseg_sample_list.txt"
+    # depth: "./data/kitti/sample_lists/train/depth_sample_list.txt" # for visualization purposes
 
 train:
   dataloader:
-    batch_size: 1
-    shuffle: False
+    batch_size: 2
+    shuffle: True
     num_workers: 1
-  aggregators_savers:
-    LossAggregator: LossSaver # bind aggregator to saver
-  savers:
-    LossSaver: LossAggregator # bind aggregator to saver
 
-epochs: 201
+early_stopping:
+  patience: 5
+  min_delta: 0.01
+
+epochs: 40
 
 model:
-  weights_file_path: ../run_info/00_ResNet18_depth_estimation_kitti/train/model.pth
+  weights_file_path: ../run_info/00_ResNet18_depth_estimation_kitti/best_model.pth
   encoder:
     name: ResNet18
     freeze_epoch: 0

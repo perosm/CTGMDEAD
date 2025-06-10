@@ -8,18 +8,17 @@ dataset:
   task_paths:
     input: "./data/kitti/input"
     object_detection: "./data/kitti/object_detection/ground_truth"
-  task_sample_list_path:
+  task_sample_list_path_train:
     object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"
+  task_sample_list_path_val:
+    object_detection: "./data/kitti/sample_lists/val/objdet_sample_list.txt"
 
 train:
   dataloader:
     batch_size: 1
     shuffle: False
     num_workers: 1
-  aggregators_savers:
-    LossAggregator: LossSaver # bind aggregator to saver
-  savers:
-    LossSaver: LossAggregator # bind aggregator to saver
+
 
 eval:
   dataloader:
@@ -28,11 +27,10 @@ eval:
     num_workers: 1
 
 model:
-  weights_file_path: ../run_info/02_ResNet18_object_detection_2d_kitti_depth_pretrained/train/model.pth
+  weights_file_path: ../run_info/02_ResNet18_object_detection_2d_kitti_depth_pretrained/best_model.pth
   encoder:
     name: ResNet18
-    pretrained: True
-    freeze_epoch: -1
+    freeze_epoch: 0
     unfreeze_epoch: -1
     pretrained_regex: ["*"]
   depth_decoder:
@@ -40,7 +38,7 @@ model:
     in_channels: 512
     channel_scale_factors: [2, 4, 8, 8]
     out_channels: 1
-    freeze_epoch: -1
+    freeze_epoch: 0
     unfreeze_epoch: -1
     pretrained_regex: ["*"]
   necks_and_heads:
@@ -106,6 +104,9 @@ loss:
       - scale_factor: 1
     - UncertaintyAwareRegressionLoss:
       - scale_factor: 1
+      - lambda_H: 1
+      - lambda_h_rec: 1
+      - iou_positive_threshold: 0.5
     - L1SizeLoss:
       - scale_factor: 1
     - L1YawLoss:
@@ -117,10 +118,10 @@ optimizer:
   name: Adam
   lr: 1e-6
 
-epochs: 10001
+epochs: 101
 
 metrics:
   object_detection:
-    # - mAP
+    - mAP_BEV
 
 save_path: ../run_info/

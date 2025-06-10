@@ -12,22 +12,20 @@ dataset:
     depth: "./data/kitti/depth"
   task_sample_list_path_train:
     depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
-    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
   task_sample_list_path_val:
-    depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
-    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
+    depth: "./data/kitti/sample_lists/val/depth_sample_list.txt"
 
 train:
   dataloader:
-    batch_size: 1
-    shuffle: False
+    batch_size: 32
+    shuffle: True
     num_workers: 1
-  aggregators_savers:
-    LossAggregator: LossSaver # bind aggregator to saver
-  savers:
-    LossSaver: LossAggregator # bind aggregator to saver
 
-epochs: 201
+early_stopping:
+  patience: 5
+  min_delta: 0.01
+
+epochs: 40
 
 model:
   weights_file_path:

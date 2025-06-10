@@ -4,27 +4,57 @@ dataset:
   dataset_name: KittiDataset
   task_transform:
     input: 
-      # - Crop
+      - Crop
     depth:
-      # - Crop
-    road_detection:
-      # - Crop
-    object_detection_3d:
+      - Crop
   task_paths:
     input: "./data/kitti/input"
-    depth: "./data/kitti/depth/train"
-    object_detection_3d: "./data/kitti/object_detection_3d/ground_truth"
-    # road_detection: "./data/kitti/semantic_segmentation"
+    depth: "./data/kitti/depth"
+  task_sample_list_path_train:
+    depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
+  task_sample_list_path_val:
+    depth: "./data/kitti/sample_lists/val/depth_sample_list.txt"
 
 train:
   dataloader:
-    batch_size: 1
-    shuffle: False
+    batch_size: 32
+    shuffle: True
     num_workers: 1
-  aggregators_savers:
-    LossAggregator: LossSaver # bind aggregator to saver
-  savers:
-    LossSaver: LossAggregator # bind aggregator to saver
+
+early_stopping:
+  patience: 5
+  min_delta: 0.01
+
+epochs: 30
+
+model:
+  weights_file_path:
+  encoder:
+    name: ResNet18
+    pretrained: True
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+  depth_decoder:
+    name: UnetDepthDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+
+prediction_postprocess: # used only in eval
+  - depth:
+    - min_depth: 0.0
+    - max_depth: 90.0
+
+loss:
+  depth: 
+    - MaskedMAE:
+      - scale_factor: 1.0
+
+optimizer:
+  name: Adam
+  lr: 1e-4
 
 eval:
   dataloader:
@@ -32,45 +62,9 @@ eval:
     shuffle: False
     num_workers: 1
 
-model:
-  encoder:
-    name: ResNet18
-    pretrained: True
-    freeze_epoch: 0
-    unfreeze_epoch: 10
-  decoder:
-    depth:
-      name: UnetDepthDecoder
-      in_channels: 512
-      channel_scale_factors: [2, 4, 8, 8]
-      out_channels: 1
-      freeze_epoch: None
-      unfreeze_epoch: None
-    road_detection:
-      name: UnetRoadDetectionDecoder
-      in_channels: 512
-      channel_scale_factors: [2, 4, 8, 8]
-      out_channels: 1
-      freeze_epoch: 0
-      unfreeze_epoch: 10
-    # object_detection_3d:
-
-
-
-loss:
-  depth: 
-    - MaskedMAE
-  road_detection:
-    - BinaryCrossEntropyLoss
-
-optimizer:
-  name: Adam
-  lr: 1e-4
-
-epochs: 20
 
 metrics:
   depth:
     - MaskedMAE
 
-save_path: ../run_info
+save_path: ../run_info/

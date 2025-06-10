@@ -9,19 +9,21 @@ dataset:
     input: "./data/kitti/input"
     object_detection: "./data/kitti/object_detection/ground_truth"
   task_sample_list_path_train:
-    object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"
+    object_detection: "./data/kitti/sample_lists/val/objdet_sample_list.txt"
   task_sample_list_path_val:
     object_detection: "./data/kitti/sample_lists/val/objdet_sample_list.txt"
 
 train:
   dataloader:
     batch_size: 1
-    shuffle: False
+    shuffle: True
     num_workers: 1
-  aggregators_savers:
-    LossAggregator: LossSaver # bind aggregator to saver
-  savers:
-    LossSaver: LossAggregator # bind aggregator to saver
+
+epochs: 40
+
+early_stopping:
+  patience: 5
+  min_delta: 0.01
 
 eval:
   dataloader:
@@ -30,7 +32,7 @@ eval:
     num_workers: 1
 
 model:
-  weights_file_path: ../run_info/01_ResNet18_road_detection_kitti_depth_pretrained/train/model.pth
+  weights_file_path: ../run_info/01_ResNet18_road_detection_kitti_depth_pretrained/best_model.pth
   encoder:
     name: ResNet18
     pretrained: True
@@ -104,14 +106,14 @@ loss:
     - RPNClassificationAndRegressionLoss:
       - scale_factor: 1.0
       - n_cls: 256
-      - positives_ratio: 0.2
+      - positives_ratio: 0.25
       - iou_negative_threshold: 0.3
       - iou_positive_threshold: 0.7
       - regularization_factor: 10.0
     - RCNNCrossEntropyAndRegressionLoss:
       - scale_factor: 1.0
       - n_cls: 256
-      - positives_ratio: 0.2
+      - positives_ratio: 0.25
       - iou_negative_threshold: 0.2
       - iou_positive_threshold: 0.5
       - regularization_factor: 10.0
@@ -120,8 +122,6 @@ loss:
 optimizer:
   name: Adam
   lr: 1e-5
-
-epochs: 101
 
 metrics:
   object_detection:
