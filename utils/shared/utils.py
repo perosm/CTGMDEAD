@@ -62,6 +62,7 @@ from utils.road_detection.metrics import (
     Recall,
     FalsePositiveRate,
     TrueNegativeRate,
+    F1Score,
 )
 from utils.object_detection.metrics import mAP
 from utils.object_detection_3d.metrics import mAP_BEV
@@ -402,6 +403,7 @@ def configure_metrics(metric_configs):
         Recall.__name__: Recall,
         TrueNegativeRate.__name__: TrueNegativeRate,
         FalsePositiveRate.__name__: FalsePositiveRate,
+        F1Score.__name__: F1Score,
         # object detection 2D metrics
         mAP.__name__: mAP,
         # object detection 3D metrics

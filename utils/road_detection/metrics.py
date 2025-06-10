@@ -25,6 +25,7 @@ class Precision(nn.Module):
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
+        self.epsilon = 1e-5
         self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
@@ -33,7 +34,7 @@ class Precision(nn.Module):
         tp = (pred & gt).sum()
         fp = (pred & ~gt).sum()
 
-        return tp / (tp + fp)
+        return tp / (tp + fp + self.epsilon)
 
 
 class Recall(nn.Module):
@@ -93,6 +94,7 @@ class F1Score(nn.Module):
     def __init__(self):
         super().__init__()
         self.threshold = 0.5
+        self.epsilon = 1e-5
         self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
@@ -101,6 +103,6 @@ class F1Score(nn.Module):
         tp = (pred & gt).sum()
         fp = (pred & ~gt).sum()
         fn = (~pred & gt).sum()
-        precision = tp / (tp + fp)
-        recall = tp / (tp + fn)
+        precision = tp / (tp + fp + self.epsilon)
+        recall = tp / (tp + fn + self.epsilon)
         return 2 * precision * recall / (precision + recall)

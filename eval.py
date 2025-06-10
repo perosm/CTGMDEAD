@@ -42,7 +42,9 @@ def eval(
 
     metrics = configure_metrics(args["metrics"])
     metrics_aggregator = MetricsAggregator(
-        task_metrics=metrics.task_metrics, num_batches=1, device=device
+        task_metrics=metrics.task_metrics,
+        num_batches=len(eval_dataloader),
+        device=device,
     )
     metrics_saver = MetricsSaver(
         metrics_aggregator=metrics_aggregator,
