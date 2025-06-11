@@ -1,4 +1,3 @@
-name: 00_ResNet18_epoch20
 device: cuda
 dataset:
   dataset_name: KittiDataset

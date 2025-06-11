@@ -4,13 +4,17 @@ dataset:
   task_transform:
     input: 
       - Crop
+    road_detection:
+      - Crop
     object_detection:
   task_paths:
     input: "./data/kitti/input" # "../../datasets/kitti_data/"
-    object_detection: "./data/kitti/object_detection/ground_truth"
+    road_detection: "./data/kitti/semantic_segmentation"
   task_sample_list_path_train:
+    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
     object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"
   task_sample_list_path_val:
+    road_detection: "./data/kitti/sample_lists/val/semseg_sample_list.txt"
     object_detection: "./data/kitti/sample_lists/val/objdet_sample_list.txt"
 
 train:
@@ -19,34 +23,33 @@ train:
     shuffle: True
     num_workers: 1
 
-epochs: 40
-
 early_stopping:
   patience: 5
   min_delta: 0.01
 
-eval:
-  dataloader:
-    batch_size: 1
-    shuffle: False
-    num_workers: 1
+epochs: 40
 
 model:
-  weights_file_path: ../run_info/01_ResNet18_road_detection_kitti_depth_pretrained/best_model.pth
   encoder:
     name: ResNet18
-    pretrained: True
-    freeze_epoch: -1
-    unfreeze_epoch: 0
+    freeze_epoch: 0
+    unfreeze_epoch: -1
     pretrained_regex: ["*"]
   depth_decoder:
     name: UnetDepthDecoder
     in_channels: 512
     channel_scale_factors: [2, 4, 8, 8]
     out_channels: 1
+    freeze_epoch: 0
+    unfreeze_epoch: -1
+    pretrained_regex: ["*"]
+  road_detection_decoder:
+    name: UnetRoadDetectionDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
     freeze_epoch: -1
     unfreeze_epoch: 0
-    pretrained_regex: ["*"]
   necks_and_heads:
     name: FPNFasterRCNN
     image_size: [256, 1184]
@@ -96,35 +99,48 @@ model:
       - unfreeze_epoch: -1
 
 prediction_postprocess: # used only in eval
-  - depth:
-    - min_depth: 0.0
-    - max_depth: 90.0
+  - road_detection: # None
   - object_detection: # None
 
 loss:
-  object_detection:
+  road_detection:
+    - BinaryCrossEntropyLoss:
+      - lambda_factor: 1.0
+  object_detection: 
     - RPNClassificationAndRegressionLoss:
-      - scale_factor: 1.0
-      - n_cls: 256
-      - positives_ratio: 0.25
-      - iou_negative_threshold: 0.3
-      - iou_positive_threshold: 0.7
-      - regularization_factor: 10.0
+      - scale_factor: 1
     - RCNNCrossEntropyAndRegressionLoss:
-      - scale_factor: 1.0
-      - n_cls: 256
-      - positives_ratio: 0.25
-      - iou_negative_threshold: 0.2
+      - scale_factor: 1
+    - UncertaintyAwareRegressionLoss:
+      - scale_factor: 1
+      - lambda_H: 1
+      - lambda_h_rec: 1
       - iou_positive_threshold: 0.5
-      - regularization_factor: 10.0
-      - num_classes: 4
+    - L1SizeLoss:
+      - scale_factor: 1
+    - L1YawLoss:
+      - scale_factor: 1
+    - L1KeypointsLoss:
+      - scale_factor: 1
 
 optimizer:
   name: Adam
-  lr: 1e-5
+  lr: 1e-4
+
+
+eval:
+  dataloader:
+    batch_size: 1
+    shuffle: False
+    num_workers: 1
 
 metrics:
-  object_detection:
-    - mAP
+  road_detection:
+    - IoU
+    - Precision
+    - Recall
+    - FalsePositiveRate
+    - TrueNegativeRate
+    - F1Score
 
 save_path: ../run_info/
