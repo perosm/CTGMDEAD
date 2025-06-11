@@ -48,7 +48,10 @@ def depth_load_util():
     Used to return the function that will load the depth data.
     """
 
-    def func(png_file_path):
+    def func(png_file_path: pathlib.Path) -> torch.Tensor:
+        if not png_file_path.exists():
+            return torch.fill_(torch.empty((3, KITTI_H, KITTI_W)), torch.nan)
+
         return torch.from_numpy(
             cv2.imread(png_file_path, cv2.IMREAD_UNCHANGED).astype(np.float32)
             / 256.0  # maybe https://pytorch.org/vision/master/generated/torchvision.io.decode_image.html#torchvision.io.decode_image?
@@ -81,7 +84,10 @@ def road_detection_load_util():
     and convert labels so we just use the road labeling.
     """
 
-    def func(png_file_path) -> torch.Tensor:
+    def func(png_file_path: pathlib.Path) -> torch.Tensor:
+        if not png_file_path.exists():
+            return torch.fill_(torch.empty((1, KITTI_H, KITTI_W)), torch.nan)
+
         ground_truth = torchvision.io.decode_image(png_file_path, mode="RGB").to(
             torch.float32
         )
@@ -101,13 +107,8 @@ def road_detection_load_util():
     return func
 
 
-# TODO: finish for objdet
-#
-# see readme from devkit_object
-# name (#values)
 # type (1), truncated (1), occluded (1), alpha (1), bbox (4), dimension (3), location (3), rotation_y (1)
-OBJDET_2D_LABEL_SHAPE = 5
-OBJDET_3D_LABEL_SHAPE = 15
+OBJDET_LABEL_SHAPE = 15
 OBJDET_CLASS_MAPPING = {
     # 0 reserved for no object
     "Car": 1,
@@ -127,13 +128,16 @@ def object_detection_load_util():
     Used to return the function that will load the object detection labels accordingly.
     """
 
-    def func(txt_file_path) -> torch.Tensor:
+    def func(txt_file_path: pathlib.Path) -> torch.Tensor:
+        if not txt_file_path.exists():
+            return torch.fill_(torch.empty((1, OBJDET_LABEL_SHAPE)), torch.nan)
+
         with open(txt_file_path, "r") as file:
             lines = [line.strip().split(" ") for line in file.readlines()]
 
         objects_to_keep = []
         NUM_DETECTIONS = len(lines)
-        gt = np.empty(shape=(NUM_DETECTIONS, OBJDET_3D_LABEL_SHAPE), dtype=np.float32)
+        gt = np.empty(shape=(NUM_DETECTIONS, OBJDET_LABEL_SHAPE), dtype=np.float32)
         for object_index, object_info in enumerate(lines):
             class_num = OBJDET_CLASS_MAPPING[object_info[0]]
             if class_num == -1:
@@ -151,7 +155,7 @@ def object_detection_load_util():
             gt[object_index, 5] -= KITTI_H - NEW_H  # top
             gt[object_index, 6] -= (KITTI_W - NEW_W) / 2  # right
             gt[object_index, 7] -= KITTI_H - NEW_H  # bottom
-            # Observation angle of object, ranging [-pi..pi
+            # Observation angle of object, ranging [-pi..pi]
             # 3 dimensions - 3D object dimensions: height, width, length (in meters)
             # 3 location0 - 3D object location x,y,z in camera coordinates (in meters)
             # 1 rotation_y - Rotation ry around Y-axis in camera coordinates [-pi..pi]

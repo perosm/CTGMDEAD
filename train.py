@@ -19,6 +19,7 @@ from utils.shared.utils import (
     configure_logger,
     move_data_to_gpu,
     configure_metrics,
+    remove_dummy_ground_truth,
 )
 
 
@@ -69,6 +70,7 @@ def train(args: dict):
         freeze_model(model, args["model"], epoch)
         for data in tqdm(train_dataloader, f"Epoch: {epoch}"):
             data = move_data_to_gpu(data)
+            data = remove_dummy_ground_truth(data)
             pred = model(data["input"])
             loss, per_batch_task_losses = losses(pred, data)
             loss.backward()

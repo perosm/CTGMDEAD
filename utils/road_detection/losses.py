@@ -9,5 +9,5 @@ class BinaryCrossEntropyLoss(nn.Module):
         self.lambda_factor = kwargs.get("lambda_factor", 1.0)
         self.loss = nn.BCELoss(reduction="mean")
 
-    def forward(self, pred, gt) -> torch.Tensor:
+    def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         return self.loss(pred, gt)

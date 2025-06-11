@@ -15,15 +15,13 @@ class mAP(nn.Module):
         super().__init__()
         self.eval()
 
-    def forward(
-        self, pred: tuple[torch.Tensor, torch.Tensor, torch.Tensor], gt: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         return mAP_pascal_voc(pred=pred, gt=gt)
 
 
 def mAP_pascal_voc(
-    pred: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
-    gt: torch.Tensor,
+    pred: torch.Tensor,
+    gt: dict[str, torch.Tensor],
 ) -> torch.Tensor:
     """
     Although we predict num_classes + background (class 0), we filter it before,

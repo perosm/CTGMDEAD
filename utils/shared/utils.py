@@ -22,11 +22,8 @@ from model.road_detection.road_detection_decoder import UnetRoadDetectionDecoder
 from model.object_detection.fpn_faster_rcnn import FPNFasterRCNN
 from model.multi_task_network import MultiTaskNetwork
 from utils.shared.enums import TaskEnum
-from utils.shared.losses import (
-    GradLoss,
-    MaskedMAE,
-    MultiTaskLoss,
-)
+from utils.shared.losses import MultiTaskLoss
+from utils.depth.losses import GradLoss, MaskedMAE
 from utils.road_detection.losses import BinaryCrossEntropyLoss
 from utils.object_detection.losses import (
     RPNClassificationAndRegressionLoss,
@@ -92,6 +89,7 @@ def configure_dataset(dataset_configs: dict[str, str | list], mode: str) -> Data
             dataset_configs["task_paths"],
             dataset_configs["task_transform"],
             task_sample_list_path=dataset_configs[f"task_sample_list_path_{mode}"],
+            co_train=dataset_configs["co_train"],
         )
     }
     return dataset_dict[dataset_configs["dataset_name"]]
@@ -441,7 +439,9 @@ def configure_visualizers(
 
 
 ############################## SHARED UTILS ##############################
-def move_data_to_gpu(data: dict[str, torch.Tensor | dict[str, torch.Tensor]]):
+def move_data_to_gpu(
+    data: dict[str, torch.Tensor | dict[str, torch.Tensor]],
+) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
     for task, value in data.items():
         if isinstance(value, torch.Tensor):
             data[task] = value.to(device="cuda")
@@ -451,3 +451,32 @@ def move_data_to_gpu(data: dict[str, torch.Tensor | dict[str, torch.Tensor]]):
                     data[task][subkey] = subvalue.to("cuda")
 
     return data
+
+
+def remove_dummy_ground_truth(
+    data: dict[str, torch.Tensor | dict[str, torch.Tensor]],
+) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
+    filtered_data = defaultdict()
+    for task, value in data.items():
+        if isinstance(value, torch.Tensor):
+            _check_ground_truth_validity(
+                data=filtered_data, task=task, ground_truth=value
+            )
+        elif isinstance(value, dict):
+            subdict = {}
+            for subkey, subvalue in value.items():
+                _check_ground_truth_validity(
+                    data=subdict, task=subkey, ground_truth=subvalue
+                )
+            filtered_data[task] = subdict
+
+    return filtered_data
+
+
+def _check_ground_truth_validity(
+    data: dict[str, torch.Tensor | dict[str, torch.Tensor]],
+    task: str,
+    ground_truth: torch.Tensor,
+) -> None:
+    if not torch.any(torch.isnan(ground_truth)):
+        data[task] = ground_truth

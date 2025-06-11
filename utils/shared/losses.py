@@ -18,60 +18,16 @@ class MultiTaskLoss(nn.Module):
         per_task_losses = {
             task: defaultdict(torch.Tensor) for task in self.task_losses.keys()
         }  # used to keep track of losses per task
-        for task, losses in self.task_losses.items():
-            for loss in losses:
+        # We do intersection of tasks because of co-training
+        # since not all ground truth data is available for each image
+        gt_tasks = set(gt.keys())
+        pred_tasks = set(pred.keys())
+        tasks = gt_tasks.intersection(pred_tasks)
+        for task in tasks:
+            for loss in self.task_losses[task]:
                 per_task_losses[task][loss.__class__.__name__] = loss(
                     pred[task], gt[task]
                 )
                 total_loss += per_task_losses[task][loss.__class__.__name__]
 
         return total_loss, per_task_losses
-
-
-class MaskedMAE(nn.Module):
-    higher = False
-
-    def __init__(self, **kwargs):
-        super().__init__()
-        self.lambda_factor = kwargs.get("lambda_factor", 1.0)
-        self._l1_loss = nn.L1Loss(reduction="none")
-
-    def forward(self, pred, gt):
-        mask = torch.where(gt != 0, 1, 0).to(DEVICE)
-        valid_points = mask.sum()
-        loss = self._l1_loss(pred * mask, gt).sum((2, 3)) / valid_points
-        return loss.mean()
-
-
-class GradLoss(nn.Module):
-    def __init__(self):
-        super().__init__()
-        sobel_x = (
-            torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=torch.float32)
-            .unsqueeze(0)
-            .unsqueeze(0)
-        ).to(DEVICE)
-        sobel_y = (
-            torch.tensor([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=torch.float32)
-            .unsqueeze(0)
-            .unsqueeze(0)
-        ).to(DEVICE)
-
-        self.conv_x = nn.Conv2d(1, 1, kernel_size=3, padding=1, bias=False).to(DEVICE)
-        self.conv_y = nn.Conv2d(1, 1, kernel_size=3, padding=1, bias=False).to(DEVICE)
-
-        self.conv_x.weight = nn.Parameter(sobel_x, requires_grad=False)
-        self.conv_y.weight = nn.Parameter(sobel_y, requires_grad=False)
-
-    def forward(self, pred, gt) -> torch.Tensor:
-        grad_pred_x = self.conv_x(pred)
-        grad_pred_y = self.conv_y(pred)
-        grad_gt_x = self.conv_x(gt)
-        grad_gt_y = self.conv_y(gt)
-
-        grad_pred = torch.sqrt(grad_pred_x**2 + grad_pred_y**2)
-        grad_gt = torch.sqrt(grad_gt_x**2 + grad_gt_y**2)
-
-        loss = F.l1_loss(grad_pred, grad_gt)
-
-        return loss

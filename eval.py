@@ -18,6 +18,7 @@ from utils.shared.aggregators.MetricsAggregator import MetricsAggregator
 from utils.shared.savers.MetricSavers import MetricsSaver
 from utils.shared.early_stopping import EarlyStopping
 from utils.shared.model_saver import ModelSaver
+from utils.shared.utils import remove_dummy_ground_truth
 
 
 def eval(
@@ -57,6 +58,7 @@ def eval(
         data = next(iter(eval_dataloader))
         for data in tqdm(eval_dataloader, f"Validating..."):
             data = move_data_to_gpu(data)
+            data = remove_dummy_ground_truth(data)
 
             model.train()
             loss, per_batch_task_losses = losses(model(data["input"]), data)

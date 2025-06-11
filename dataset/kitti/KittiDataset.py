@@ -21,6 +21,7 @@ class KittiDataset(Dataset):
         task_transform: dict[str, list],
         task_sample_list_path: dict[str, str] = None,
         camera: str = "image_02",
+        co_train: bool = False,
     ) -> None:
         """
         Args:
@@ -30,6 +31,7 @@ class KittiDataset(Dataset):
                   paired with the path to the folder where the ground truth for each of the tasks is stored.
          - task_sample_list: List of samples used for that task (used for filtering).
         """
+        self.co_train = co_train
         self.camera = camera
         self.camera_index = int(camera[-1])
         self.ground_truth_path_to_projection_matrices = {}
@@ -165,8 +167,17 @@ class KittiDataset(Dataset):
             "/".join(path.with_suffix("").parts[self.UNIQUE_PATH_PARTS_NUMBER :])
             for path in self.paths_dict[KITTIutils.TaskEnum.input]
         )
-        for task, unique_data in self.task_sample_list.items():
-            final_paths = final_paths.intersection(unique_data)
+        if not self.co_train:
+            for task, unique_data in self.task_sample_list.items():
+                final_paths = final_paths.intersection(unique_data)
+        else:
+            # When co-training we want to have all input images available so instead
+            # of intersection we use union and for paths that don't exist we generate
+            # dummy ground truth and set the loss to zero so we don't backprop
+            first_task_name = next(iter(self.task_sample_list))
+            final_paths = self.task_sample_list[first_task_name]
+            for task, unique_data in self.task_sample_list.items():
+                final_paths = final_paths.union(unique_data)
 
         for task in task_absolute_root_paths.keys():
             self.paths_dict[task] = sorted(
@@ -176,7 +187,7 @@ class KittiDataset(Dataset):
                 ]
             )
 
-        self.length = len(final_paths)
+        self.length = len(list(final_paths)[:10])
 
     def get_item_name(self, idx):
         task_item = dict.fromkeys(self.paths_dict.keys())

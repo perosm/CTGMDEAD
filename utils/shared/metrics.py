@@ -17,9 +17,13 @@ class MultiTaskMetrics(nn.Module):
         per_task_metrics = {
             task: defaultdict(torch.Tensor) for task in self.task_metrics.keys()
         }
-
-        for task, metrics in self.task_metrics.items():
-            for metric in metrics:
+        # We do intersection of tasks because of co-training
+        # since not all ground truth data is available for each image
+        gt_tasks = set(gt.keys())
+        pred_tasks = set(pred.keys())
+        tasks = gt_tasks.intersection(pred_tasks)
+        for task in tasks:
+            for metric in self.task_metrics[task]:
                 per_task_metrics[task][metric.__class__.__name__] = metric(
                     pred[task], gt[task]
                 )
