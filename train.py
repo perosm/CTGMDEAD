@@ -44,7 +44,7 @@ def train(args: dict):
     loss_aggregator = LossAggregator(
         task_losses=losses.task_losses,
         epochs=epochs,
-        num_batches=len(train_dataloader),
+        num_batches_total=len(train_dataloader),
         device=device,
     )
     loss_saver = LossSaver(
@@ -59,7 +59,7 @@ def train(args: dict):
     val_loss_aggregator = LossAggregator(
         task_losses=losses.task_losses,
         epochs=epochs,
-        num_batches=1,  # will be set to len(val_dataloader)
+        num_batches_total=1,  # will be set to len(val_dataloader)
         device="cpu",
     )
     val_loss_saver = LossSaver(

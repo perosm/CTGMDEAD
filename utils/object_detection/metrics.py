@@ -2,10 +2,17 @@ import torch
 from torch import nn
 
 from torchvision.ops import box_iou
+from utils.shared.enums import ObjectDetectionEnum
 
 NUM_CLASSES = 4
 EPSILON = 1e-5
 IOU_THRESHOLD = 0.5
+PRED_LABEL_INDEX = 0
+PRED_PROBITS_INDEX = 1
+PRED_BOUNDING_BOX_2D_SLICE = slice(2, 6)
+GT_BOUNDING_BOX_2D_SLICE = slice(
+    ObjectDetectionEnum.box_2d_left, ObjectDetectionEnum.box_2d_bottom + 1
+)
 
 
 class mAP(nn.Module):
@@ -14,14 +21,35 @@ class mAP(nn.Module):
     def __init__(self):
         super().__init__()
         self.eval()
+        self.register_forward_pre_hook(mAP._extract_relevant_tensor_info)
 
-    def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
+    @staticmethod
+    def _extract_relevant_tensor_info(
+        module: nn.Module,
+        inputs: tuple[dict[str, tuple[torch.Tensor, torch.Tensor]], torch.Tensor],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        pred, gt = inputs
+        gt_info = gt["gt_info"].squeeze(0)
+
+        pred_label = pred[:, PRED_LABEL_INDEX]
+        pred_probits = pred[:, PRED_PROBITS_INDEX]
+        pred_box_2d = pred[:, PRED_BOUNDING_BOX_2D_SLICE]
+        gt_label = gt_info[:, ObjectDetectionEnum.object_class]
+        gt_box_2d = gt_info[:, GT_BOUNDING_BOX_2D_SLICE]
+
+        return (pred_label, pred_probits, pred_box_2d), (gt_label, gt_box_2d)
+
+    def forward(
+        self,
+        pred: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        gt: tuple[torch.Tensor, torch.Tensor],
+    ) -> torch.Tensor:
         return mAP_pascal_voc(pred=pred, gt=gt)
 
 
 def mAP_pascal_voc(
-    pred: torch.Tensor,
-    gt: dict[str, torch.Tensor],
+    pred: tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+    gt: tuple[torch.Tensor, torch.Tensor],
 ) -> torch.Tensor:
     """
     Although we predict num_classes + background (class 0), we filter it before,
@@ -29,13 +57,14 @@ def mAP_pascal_voc(
     This works only for a single image.
 
     Args:
-        - pred: Tuple of (class_probits, pred_boxes, labels).
+        - pred: Tuple of (labels, class_probits, pred_boxes).
         - gt: Ground truth object of format (label, top, left, bottom, right).
     """
-    gt = gt.squeeze(0)
-    class_probits, pred_boxes, pred_labels = pred
-    gt_labels, gt_boxes = gt[:, 0], gt[:, 1:]
-    average_precision_per_class = torch.zeros(NUM_CLASSES - 1)
+    pred_labels, class_probits, pred_boxes = pred
+    gt_labels, gt_boxes = gt
+    device = pred_labels.device
+    recall_points_aranged = torch.arange(0, 1.1, 0.1).to(device)
+    average_precision_per_class = torch.zeros(NUM_CLASSES - 1).to(device)
     for c in range(1, NUM_CLASSES):
         # Fetch indices of current class
         pred_indices = torch.where(pred_labels == c)[0]
@@ -90,14 +119,10 @@ def mAP_pascal_voc(
         recall = tp_cumsum / (num_gt_boxes + EPSILON)
         # https://jonathan-hui.medium.com/map-mean-average-precision-for-object-detection-45c121a31173
         average_precision = 0.0
-        for r in torch.arange(0, 1.1, 0.1):
-            mask = recall >= r
-            if mask.any():
-                p = precision[mask].max()
-            else:
-                p = 0.0
-            ap += p
-        ap /= 11.0
-
+        for t in recall_points_aranged:
+            mask = recall >= t
+            p_max = precision[mask].max() if mask.any() else torch.zeros(1).to(device)
+            average_precision += p_max.item()
+        average_precision /= 11.0
         average_precision_per_class[c - 1] = average_precision
     return average_precision_per_class.mean()

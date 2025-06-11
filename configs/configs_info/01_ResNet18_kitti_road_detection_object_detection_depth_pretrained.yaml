@@ -154,6 +154,6 @@ metrics:
     - F1Score
   object_detection:
     - mAP
-    - mAP_BEV
+    # - mAP_BEV
 
 save_path: ../run_info/
