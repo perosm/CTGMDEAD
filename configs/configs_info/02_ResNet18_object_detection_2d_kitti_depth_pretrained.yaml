@@ -6,7 +6,7 @@ dataset:
       - Crop
     object_detection:
   task_paths:
-    input: "./data/kitti/input"
+    input: "./data/kitti/input" # "../../datasets/kitti_data/"
     object_detection: "./data/kitti/object_detection/ground_truth"
   task_sample_list_path_train:
     object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"

@@ -69,7 +69,7 @@ def eval(
 
             per_batch_task_metrics = metrics(pred, data)
             metrics_aggregator.aggregate_per_batch(per_batch_task_metrics)
-        early_stopping(loss_aggregator.loss_per_epochs[epoch].item())
+        early_stopping(loss_aggregator.total_loss_per_epochs[epoch].item())
 
     metrics_saver.save()
     model_saver(model, metrics_aggregator.task_metrics_per_epochs)

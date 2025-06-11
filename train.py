@@ -78,7 +78,7 @@ def train(args: dict):
 
         logger.log(
             logging.INFO,
-            f"epoch {epoch}: loss={loss_aggregator.loss_per_epochs[epoch].item()}",
+            f"epoch {epoch}: loss={loss_aggregator.total_loss_per_epochs[epoch].item()}",
         )
         eval.eval(args, model, epoch, early_stopping, val_loss_aggregator, model_saver)
         if early_stopping.early_stop:

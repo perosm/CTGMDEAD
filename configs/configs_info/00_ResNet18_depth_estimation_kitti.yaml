@@ -8,7 +8,7 @@ dataset:
     depth:
       - Crop
   task_paths:
-    input: "./data/kitti/input"
+    input: "./data/kitti/input" # "../../datasets/kitti_data/"
     depth: "./data/kitti/depth"
   task_sample_list_path_train:
     depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"

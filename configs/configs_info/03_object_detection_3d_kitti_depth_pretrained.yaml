@@ -6,7 +6,7 @@ dataset:
       - Crop
     object_detection:
   task_paths:
-    input: "./data/kitti/input"
+    input: "./data/kitti/input" # "../../datasets/kitti_data/"
     object_detection: "./data/kitti/object_detection/ground_truth"
   task_sample_list_path_train:
     object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"
@@ -16,7 +16,7 @@ dataset:
 train:
   dataloader:
     batch_size: 1
-    shuffle: False
+    shuffle: True
     num_workers: 1
 
 
@@ -118,7 +118,7 @@ optimizer:
   name: Adam
   lr: 1e-6
 
-epochs: 101
+epochs: 40
 
 metrics:
   object_detection:

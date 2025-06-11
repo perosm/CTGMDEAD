@@ -1,6 +1,6 @@
 import torch
+import numpy as np
 from torch import nn
-from collections import defaultdict
 from utils.shared.aggregators.Aggregator import Aggregator
 
 
@@ -19,11 +19,10 @@ class LossAggregator(Aggregator):
         self.epochs = epochs
         self.batch_cnt = 0
         self.num_batches = num_batches
-        self.loss_per_epochs = torch.zeros(epochs).to(device)
+        self.total_loss_per_epochs = np.zeros(epochs)
         self.task_losses_per_epochs: dict[str, dict[str, list[float]]] = {
             task: {
-                loss.__class__.__name__: torch.zeros(epochs).to(device)
-                for loss in task_losses[task]
+                loss.__class__.__name__: np.zeros(epochs) for loss in task_losses[task]
             }
             for task in task_losses.keys()
         }
@@ -34,9 +33,9 @@ class LossAggregator(Aggregator):
         self.batch_cnt += 1
         for task, losses in per_batch_values.items():
             for loss_name, loss_value in losses.items():
-                self.task_losses_per_epochs[task][loss_name][
-                    self.epoch_cnt
-                ] += loss_value.item()
+                self.task_losses_per_epochs[task][loss_name][self.epoch_cnt] += (
+                    loss_value.detach().cpu().numpy()
+                )
 
         if self.batch_cnt == self.num_batches:
             self._aggregate_per_epoch()
@@ -44,9 +43,10 @@ class LossAggregator(Aggregator):
     def _aggregate_per_epoch(self) -> None:
         for task, losses in self.task_losses_per_epochs.items():
             for _, loss_value in losses.items():
-                self.loss_per_epochs[self.epoch_cnt] += (
+                loss_value[self.epoch_cnt] = (
                     loss_value[self.epoch_cnt] / self.num_batches
                 )
+                self.total_loss_per_epochs[self.epoch_cnt] += loss_value[self.epoch_cnt]
 
         self.epoch_cnt += 1
         self.batch_cnt = 0

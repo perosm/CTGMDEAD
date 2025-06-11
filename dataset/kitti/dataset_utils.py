@@ -19,7 +19,7 @@ def task_check_file_extension(task: str, file_path: str):
     Used for filtering right files in KittiDataset.
     """
     task_extensions = {
-        TaskEnum.input: [".png"],
+        TaskEnum.input: [".png", ".jpg"],
         TaskEnum.depth: [".png"],
         TaskEnum.road_detection: [".png"],
         TaskEnum.object_detection: [".txt"],

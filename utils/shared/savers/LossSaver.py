@@ -1,6 +1,5 @@
 import pathlib
 import numpy as np
-import torch
 import matplotlib.pyplot as plt
 import json
 from collections import defaultdict
@@ -28,7 +27,7 @@ class LossSaver(Saver):
 
     @staticmethod
     def _make_it_json_serializable(
-        task_loss_per_epoch: dict[str, dict[str, torch.Tensor]],
+        task_loss_per_epoch: dict[str, dict[str, np.ndarray]],
     ) -> dict[str, dict[str, list[float]]]:
         task_loss_per_epoch_serializable = defaultdict(dict[str, list])
         for task in task_loss_per_epoch.keys():
@@ -39,25 +38,25 @@ class LossSaver(Saver):
 
         return task_loss_per_epoch_serializable
 
-    def save_plot(self) -> None:  # TODO: should I make one plot for each of the tasks?
+    def save_plot(self) -> None:
         task_loss_per_epoch = self.aggregator.return_aggregated()
         epochs_array = np.arange(0, self.aggregator.epochs)
-        total_loss = torch.zeros(self.aggregator.epochs).to(self.device)
+        total_loss = np.zeros(self.aggregator.epochs)
         fig, ax = plt.subplots(len(task_loss_per_epoch.keys()) + 1, 1, figsize=(16, 10))
         for row, (task, losses) in enumerate(task_loss_per_epoch.items()):
-            total_loss_per_task = torch.zeros(self.aggregator.epochs).to(self.device)
+            total_loss_per_task = np.zeros(self.aggregator.epochs)
             for loss_name, loss_value in losses.items():
                 ax[row + 1].plot(
                     epochs_array,
-                    loss_value.cpu().numpy(),
+                    loss_value,
                     label=loss_name,
                 )
                 ax[row + 1].set_title(task)
                 ax[row + 1].legend()
                 total_loss_per_task += loss_value
             total_loss += total_loss_per_task
-            ax[0].plot(epochs_array, total_loss_per_task.cpu().numpy(), label=task)
-        ax[0].plot(epochs_array, total_loss.cpu().numpy())
+            ax[0].plot(epochs_array, total_loss_per_task, label=task)
+        ax[0].plot(epochs_array, total_loss)
         ax[0].set_title("Losses")
         ax[0].legend()
         plt.ioff()

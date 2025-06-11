@@ -10,7 +10,7 @@ dataset:
     road_detection:
       - Crop
   task_paths:
-    input: "./data/kitti/input"
+    input: "./data/kitti/input" # "../../datasets/kitti_data/"
     # depth: "./data/kitti/depth" # for visualization purposes
     road_detection: "./data/kitti/semantic_segmentation"
   task_sample_list_path_train:
