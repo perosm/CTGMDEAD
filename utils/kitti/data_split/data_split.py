@@ -241,33 +241,74 @@ def split_dataset(
 
     # Flatten dicts of {depth/semantic_segmentation/object_detection}_date_drive_sample_list_{train/val}
     # into list {depth/semantic_segmentation/object_detection}_sample_list_{train/val} and save them as a .txt file
+    depth_sample_list_train = _flatten_into_list(
+        date_drive_sample_list=depth_date_drive_sample_list_train
+    )
+    depth_sample_list_val = _flatten_into_list(
+        date_drive_sample_list=depth_date_drive_sample_list_val
+    )
+    semseg_sample_list_train = _flatten_into_list(
+        date_drive_sample_list=semseg_date_drive_sample_list_train
+    )
+    semseg_sample_list_val = _flatten_into_list(
+        date_drive_sample_list=semseg_date_drive_sample_list_val
+    )
+    objdet_sample_list_train = _flatten_into_list(
+        date_drive_sample_list=objdet_date_drive_sample_list_train
+    )
+    objdet_sample_list_val = _flatten_into_list(
+        date_drive_sample_list=objdet_date_drive_sample_list_val
+    )
+
+    assert (
+        set(depth_sample_list_train).intersection(set(depth_sample_list_val)) == set()
+    ), f"Intersection between depth_sample_list_train and depth_sample_list_val should be empty!"
+    assert (
+        set(depth_sample_list_train).intersection(
+            set(semseg_date_drive_sample_list_val)
+        )
+        == set()
+    ), f"Intersection between depth_sample_list_train and semseg_sample_list_val should be empty!"
+    assert (
+        set(depth_sample_list_train).intersection(set(objdet_sample_list_val)) == set()
+    ), f"Intersection between depth_sample_list_train and objdet_sample_list_val should be empty!"
+    assert (
+        set(semseg_sample_list_train).intersection(set(semseg_sample_list_val)) == set()
+    ), f"Intersection between semseg_sample_list_train and semseg_sample_list_val should be empty!"
+    assert (
+        set(semseg_sample_list_train).intersection(set(objdet_sample_list_val)) == set()
+    ), f"Intersection between semseg_sample_list_train and objdet_sample_list_val should be empty!"
+    assert (
+        set(objdet_sample_list_train).intersection(set(objdet_sample_list_val)) == set()
+    ), f"Intersection between objdet_sample_list_train and objdet_sample_list_val should be empty!"
+
     _save_data(
-        date_drive_sample_list=depth_date_drive_sample_list_train,
+        sample_list=depth_sample_list_train,
         save_path=save_path / "train",
         filename="depth_sample_list.txt",
     )
     _save_data(
-        date_drive_sample_list=depth_date_drive_sample_list_val,
+        sample_list=depth_sample_list_val,
         save_path=save_path / "val",
         filename="depth_sample_list.txt",
     )
     _save_data(
-        date_drive_sample_list=semseg_date_drive_sample_list_train,
+        sample_list=semseg_sample_list_train,
         save_path=save_path / "train",
         filename="semseg_sample_list.txt",
     )
     _save_data(
-        date_drive_sample_list=semseg_date_drive_sample_list_val,
+        sample_list=semseg_sample_list_val,
         save_path=save_path / "val",
         filename="semseg_sample_list.txt",
     )
     _save_data(
-        date_drive_sample_list=objdet_date_drive_sample_list_train,
+        sample_list=objdet_sample_list_train,
         save_path=save_path / "train",
         filename="objdet_sample_list.txt",
     )
     _save_data(
-        date_drive_sample_list=objdet_date_drive_sample_list_val,
+        sample_list=objdet_sample_list_val,
         save_path=save_path / "val",
         filename="objdet_sample_list.txt",
     )
@@ -384,21 +425,20 @@ def _get_sample_list_statistics(
     print("___________________________________________________________")
 
 
-def _save_data(
-    date_drive_sample_list: dict[str, list[str]], save_path: pathlib.Path, filename: str
-) -> None:
-    sample_list = _flatten_into_list(date_drive_sample_list)
-    save_path.mkdir(parents=True, exist_ok=True)
-    with open(save_path / filename, "w") as file:
-        file.writelines(f"{sample}\n" for sample in sample_list)
-
-
 def _flatten_into_list(date_drive_sample_list: dict[str, list[str]]) -> list[str]:
     sample_list = []
     for date_drive in date_drive_sample_list:
         sample_list.extend(date_drive_sample_list[date_drive])
 
     return sorted(sample_list)
+
+
+def _save_data(
+    sample_list: dict[str, list[str]], save_path: pathlib.Path, filename: str
+) -> None:
+    save_path.mkdir(parents=True, exist_ok=True)
+    with open(save_path / filename, "w") as file:
+        file.writelines(f"{sample}\n" for sample in sample_list)
 
 
 if __name__ == "__main__":
