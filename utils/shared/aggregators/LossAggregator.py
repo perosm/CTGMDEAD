@@ -10,7 +10,6 @@ class LossAggregator(Aggregator):
         task_losses: dict[str, list[nn.Module]],
         epochs: int,
         num_batches_total: int,
-        device: str,
     ):
         """
         Used to track total loss per epoch and loss per task per epoch.

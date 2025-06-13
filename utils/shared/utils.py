@@ -358,11 +358,13 @@ def configure_loss(loss_configs: dict) -> MultiTaskLoss:
     }
     task_losses = {task: [] for task in loss_configs.keys()}
     for task in loss_configs.keys():
-        for loss_name_args_dict in loss_configs[task]:
-            for loss_name, args_list in loss_name_args_dict.items():
-                task_losses[task].append(
-                    loss_dict[loss_name](**list_of_dict_to_dict(args_list))
-                )
+        if loss_configs[task]:
+            # quick fix to autoencoder structure
+            for loss_name_args_dict in loss_configs[task]:
+                for loss_name, args_list in loss_name_args_dict.items():
+                    task_losses[task].append(
+                        loss_dict[loss_name](**list_of_dict_to_dict(args_list))
+                    )
 
     return MultiTaskLoss(task_losses)
 
@@ -433,8 +435,10 @@ def configure_metrics(metric_configs):
     }
     task_metrics = {task: [] for task in metric_configs.keys()}
     for task in metric_configs.keys():
-        for metric_name in metric_configs[task]:
-            task_metrics[task].append(metrics_dict[metric_name]())
+        if metric_configs[task]:
+            # quick fix to autoencoder structure
+            for metric_name in metric_configs[task]:
+                task_metrics[task].append(metrics_dict[metric_name]())
 
     return MultiTaskMetrics(task_metrics)
 

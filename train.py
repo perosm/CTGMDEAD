@@ -45,7 +45,6 @@ def train(args: dict):
         task_losses=losses.task_losses,
         epochs=epochs,
         num_batches_total=len(train_dataloader),
-        device=device,
     )
     loss_saver = LossSaver(
         loss_aggregator=loss_aggregator, save_dir=train_save_dir, device=device
@@ -60,7 +59,6 @@ def train(args: dict):
         task_losses=losses.task_losses,
         epochs=epochs,
         num_batches_total=1,  # will be set to len(val_dataloader)
-        device="cpu",
     )
     val_loss_saver = LossSaver(
         loss_aggregator=val_loss_aggregator, save_dir=val_save_dir
@@ -82,10 +80,7 @@ def train(args: dict):
             logging.INFO,
             f"epoch {epoch}: loss={loss_aggregator.total_loss_per_epochs[epoch].item()}",
         )
-        if epoch % 100 == 0:
-            eval.eval(
-                args, model, epoch, early_stopping, val_loss_aggregator, model_saver
-            )
+        eval.eval(args, model, epoch, early_stopping, val_loss_aggregator, model_saver)
         if early_stopping.early_stop:
             logger.log(logging.INFO, f"Early stopping at epoch {epoch}!")
             break

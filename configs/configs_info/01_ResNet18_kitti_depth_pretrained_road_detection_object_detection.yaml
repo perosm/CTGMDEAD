@@ -1,7 +1,7 @@
 device: cuda
 dataset:
   dataset_name: KittiDataset
-  co_train: True
+  co_train: True # set to True since non overlapping examples do exist
   task_transform:
     input: 
       - Crop
@@ -34,20 +34,20 @@ early_stopping:
   patience: 5
   min_delta: 0.01
 
-epochs: 1000
+epochs: 10
 
 model:
-  weights_file_path: ../run_info/00_ResNet18_depth_estimation_kitti/best_model.pth
+  weights_file_path: ../run_info/00_ResNet18_kitti_depth_estimation/best_model.pth
   encoder:
     name: ResNet18
     freeze_epoch: 0
     unfreeze_epoch: -1
     pretrained_regex: ["*"]
-  image_decoder:
-    name: UnetImageDecoder
+  input_reconstruction_decoder:
+    name: UnetInputReconstructionDecoder
     in_channels: 512
     channel_scale_factors: [2, 4, 8, 8]
-    out_channels: 1
+    out_channels: 3
     freeze_epoch: -1
     unfreeze_epoch: 0
   depth_decoder:
@@ -80,7 +80,7 @@ model:
       - iou_threshold: 0.7
       - pre_nms_filtering: 6000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
       - top_k_proposals_training: 256 # per fpn layer
-      - top_k_proposals_testing: 16 # per fpn layer
+      - top_k_proposals_testing: 8 # per fpn layer
       - anchor_generator:
         - sizes: [[64], [128], [256], [512]]
         - aspect_ratios: [0.5, 1, 2]
@@ -121,6 +121,8 @@ prediction_postprocess: # used only in eval
   - object_detection: # None
 
 loss:
+  input: # 
+  depth:
   road_detection:
     - BinaryCrossEntropyLoss:
       - lambda_factor: 1.0
@@ -152,6 +154,7 @@ eval:
     num_workers: 1
 
 metrics:
+  input: # 
   road_detection:
     - IoU
     - Precision
