@@ -225,9 +225,7 @@ class FPNFasterRCNN(nn.Module):
         bounding_boxes = clip_boxes_to_image(boxes=bounding_boxes, size=self.image_size)
 
         # 2) Remove small boxes
-        keep = remove_small_boxes(
-            boxes=bounding_boxes, min_size=16
-        )  # TODO: to which value do we set this?
+        keep = remove_small_boxes(boxes=bounding_boxes, min_size=16)
         bounding_boxes = bounding_boxes[keep]
         class_probits = class_probits[keep]
         labels = labels[keep]

@@ -34,7 +34,7 @@ early_stopping:
   patience: 5
   min_delta: 0.01
 
-epochs: 40
+epochs: 1000
 
 model:
   weights_file_path: ../run_info/00_ResNet18_depth_estimation_kitti/best_model.pth
@@ -43,6 +43,13 @@ model:
     freeze_epoch: 0
     unfreeze_epoch: -1
     pretrained_regex: ["*"]
+  image_decoder:
+    name: UnetImageDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    freeze_epoch: -1
+    unfreeze_epoch: 0
   depth_decoder:
     name: UnetDepthDecoder
     in_channels: 512
@@ -89,22 +96,22 @@ model:
       - score_threshold: 0.3
       - top_k_boxes_training: 256
       - top_k_boxes_testing: 2
-      - freeze_epoch: -1
-      - unfreeze_epoch: 0
+      - freeze_epoch: 0
+      - unfreeze_epoch: -1
     distance_head:
       - num_conv_layers: 1
       - num_channels: 256
       - num_fc_layers: 2
       - fc_features: 1024
-      - freeze_epoch: 0
-      - unfreeze_epoch: -1
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
     attribute_head:
       - num_conv_layers: 1
       - num_channels: 256
       - num_fc_layers: 2
       - fc_features: 1024
-      - freeze_epoch: 0
-      - unfreeze_epoch: -1
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
 
 prediction_postprocess: # used only in eval
   - depth:
@@ -136,7 +143,7 @@ loss:
 
 optimizer:
   name: Adam
-  lr: 1e-4
+  lr: 1e-5
 
 eval:
   dataloader:

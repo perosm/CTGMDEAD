@@ -17,12 +17,16 @@ from utils.shared.metrics import MultiTaskMetrics
 
 from dataset.kitti.KittiDataset import KittiDataset
 from model.resnet import ResNet18, ResNet
+from model.input_reconstruction.input_reconstruction_decoder import (
+    UnetInputReconstructionDecoder,
+)
 from model.depth_estimation.depth_decoder import UnetDepthDecoder
 from model.road_detection.road_detection_decoder import UnetRoadDetectionDecoder
 from model.object_detection.fpn_faster_rcnn import FPNFasterRCNN
 from model.multi_task_network import MultiTaskNetwork
 from utils.shared.enums import TaskEnum
 from utils.shared.losses import MultiTaskLoss
+from utils.input_reconstruction.losses import MSE
 from utils.depth.losses import GradLoss, MaskedMAE
 from utils.road_detection.losses import BinaryCrossEntropyLoss
 from utils.object_detection.losses import (
@@ -37,6 +41,9 @@ from utils.object_detection_3d.losses import (
 )
 
 from utils.shared.prediction_postprocessor import PredictionPostprocessor
+from utils.input_reconstruction.prediction_postprocessor import (
+    PredictionPostprocessor as InputPredictionPostProcessor,
+)
 from utils.depth.prediction_postprocessor import (
     PredictionPostprocessor as DepthPredictionPostProcessor,
 )
@@ -44,8 +51,9 @@ from utils.road_detection.prediction_postprocessor import (
     PredictionPostprocessor as RoadPredictionPostprocessor,
 )
 from utils.object_detection.prediction_postprocessor import (
-    PredictionPostprocessor as ObjectDetectionDPredictionPostprocessor,
+    PredictionPostprocessor as ObjectDetectionPredictionPostprocessor,
 )
+from utils.input_reconstruction.metrics import SSIM
 from utils.depth.metrics import (
     MaskedAverageRelativeError,
     MaskedMeanAbsoluteError,
@@ -64,6 +72,9 @@ from utils.road_detection.metrics import (
 from utils.object_detection.metrics import mAP
 from utils.object_detection_3d.metrics import mAP_BEV
 from utils.shared.visualizer import Visualizer
+from utils.input_reconstruction.visualizer import (
+    Visualizer as InputReconstructionVisualizer,
+)
 from utils.object_detection.visualizer import Visualizer as ObjectDetectionVisualizer
 from utils.depth.visualizer import Visualizer as DepthVisualizer
 from utils.road_detection.visualizer import Visualizer as RoadVisualizer
@@ -136,10 +147,14 @@ def configure_logger(save_dir: pathlib.Path, module_name: str) -> logging.Logger
 ############################## MODEL UTILS ##############################
 def configure_model(model_configs: dict, device: torch.device) -> nn.Module:
     encoder = _configure_encoder(model_configs["encoder"]).to(device)
-    depth_decoder = _configure_decoder(model_configs["depth_decoder"]).to(device)
+    input_reconstruction_decoder = _configure_decoder(
+        model_configs["input_reconstruction_decoder"]
+    )
+    depth_decoder = _configure_decoder(model_configs.get("depth_decoder", None))
     road_detection_decoder = _configure_decoder(
         model_configs.get("road_detection_decoder", None)
     )
+
     if road_detection_decoder:
         road_detection_decoder = road_detection_decoder.to(device)
 
@@ -148,6 +163,7 @@ def configure_model(model_configs: dict, device: torch.device) -> nn.Module:
     )
     model = MultiTaskNetwork(
         encoder=encoder,
+        input_reconstruction_decoder=input_reconstruction_decoder,
         depth_decoder=depth_decoder,
         road_detection_decoder=road_detection_decoder,
         heads_and_necks=necks_and_heads,
@@ -166,6 +182,7 @@ def _configure_encoder(encoder_configs: dict) -> nn.Module:
 
 def _configure_decoder(decoder_configs: dict) -> nn.Module:
     decoder_dict = {
+        UnetInputReconstructionDecoder.__name__: UnetInputReconstructionDecoder,
         UnetDepthDecoder.__name__: UnetDepthDecoder,
         UnetRoadDetectionDecoder.__name__: UnetRoadDetectionDecoder,
     }
@@ -251,6 +268,7 @@ def print_model_size(model: nn.Module) -> None:
 def freeze_model(model: MultiTaskNetwork, model_configs: dict, epoch: int = 0) -> None:
     submodules_dict = {
         "encoder": model.encoder,
+        "input_reconstruction_decoder": model.input_reconstruction_decoder,
         "depth_decoder": model.depth_decoder,
         "road_detection_decoder": getattr(model, "road_detection_decoder", None),
     }
@@ -322,6 +340,8 @@ def freeze_params(
 ############################## TRAIN UTILS ##############################
 def configure_loss(loss_configs: dict) -> MultiTaskLoss:
     loss_dict = {
+        # input reconstruction losses
+        MSE.__name__: MSE,
         # depth losses
         MaskedMAE.__name__: MaskedMAE,
         GradLoss.__name__: GradLoss,
@@ -360,9 +380,10 @@ def configure_eval_prediction_postprocessor(
 ) -> PredictionPostprocessor:
     per_task_postprocessing_funcs = {}
     postprocess_functions = {
+        TaskEnum.input: InputPredictionPostProcessor,
         TaskEnum.depth: DepthPredictionPostProcessor,
         TaskEnum.road_detection: RoadPredictionPostprocessor,
-        TaskEnum.object_detection: ObjectDetectionDPredictionPostprocessor,
+        TaskEnum.object_detection: ObjectDetectionPredictionPostprocessor,
     }
     merged_postprocess_info = defaultdict(dict)
     for task_postprocess_info in task_postprocess_infos:
@@ -389,6 +410,9 @@ def configure_eval_prediction_postprocessor(
 ############################## TEST UTILS ##############################
 def configure_metrics(metric_configs):
     metrics_dict = {
+        # input reconstruction
+        MSE.__name__: MSE,
+        SSIM.__name__: SSIM,
         # depth metrics
         MaskedAverageRelativeError.__name__: MaskedAverageRelativeError,
         MaskedMAE.__name__: MaskedMAE,
@@ -422,6 +446,7 @@ def configure_visualizers(
     save_path = save_dir / "images"
 
     visualizers_dict = {
+        InputReconstructionVisualizer.task: InputReconstructionVisualizer,
         ObjectDetectionVisualizer.task: ObjectDetectionVisualizer,
         DepthVisualizer.task: DepthVisualizer,
         RoadVisualizer.task: RoadVisualizer,

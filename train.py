@@ -82,7 +82,10 @@ def train(args: dict):
             logging.INFO,
             f"epoch {epoch}: loss={loss_aggregator.total_loss_per_epochs[epoch].item()}",
         )
-        eval.eval(args, model, epoch, early_stopping, val_loss_aggregator, model_saver)
+        if epoch % 100 == 0:
+            eval.eval(
+                args, model, epoch, early_stopping, val_loss_aggregator, model_saver
+            )
         if early_stopping.early_stop:
             logger.log(logging.INFO, f"Early stopping at epoch {epoch}!")
             break

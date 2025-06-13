@@ -53,7 +53,6 @@ class AnchorGenerator(nn.Module):
             for size, aspect_ratio in zip(sizes, aspect_ratios)
         ]
 
-    # TODO: https://github.com/pytorch/pytorch/issues/26792
     # For every (aspect_ratios, scales) combination, output a zero-centered anchor with those values.
     # (scales, aspect_ratios) are usually an element of zip(self.scales, self.aspect_ratios)
     # This method assumes aspect ratio = height / width for an anchor.
