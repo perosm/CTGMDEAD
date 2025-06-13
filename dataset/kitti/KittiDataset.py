@@ -187,7 +187,7 @@ class KittiDataset(Dataset):
                 ]
             )
 
-        self.length = len(list(final_paths)[:10])
+        self.length = len(list(final_paths)[:1])
 
     def get_item_name(self, idx):
         task_item = dict.fromkeys(self.paths_dict.keys())

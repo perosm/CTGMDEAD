@@ -159,7 +159,7 @@ def match_proposals_to_objects(
     # IoU > iou_positive_threshold
     # and we force always at least one anchor per gt
     positive_mask = max_iou_per_proposal > iou_threshold
-    positive_mask[gt_best_proposal_indices] = True  # TODO: remove comment?
+    positive_mask[gt_best_proposal_indices] = True
 
     pos_proposal_indices = torch.where(positive_mask)[0]
     pos_gt_indices = gt_indices[pos_proposal_indices]

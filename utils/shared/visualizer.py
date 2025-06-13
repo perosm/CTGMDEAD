@@ -29,7 +29,10 @@ class Visualizer:
         self.save_dir.mkdir(parents=True, exist_ok=True)
 
     def plot_visualizations(
-        self, pred: torch.Tensor, gt: torch.Tensor, image: torch.Tensor
+        self,
+        pred: dict[str, torch.Tensor],
+        gt: dict[str, torch.Tensor],
+        image: torch.Tensor,
     ):
         data_to_plot = {
             TaskEnum.input: image.squeeze(0)
@@ -38,7 +41,10 @@ class Visualizer:
             .numpy()
             .astype(np.uint8)
         }
-        for task in self.visualizers:
+        pred_tasks = set(pred.keys())
+        gt_tasks = set(gt.keys())
+        tasks = pred_tasks.intersection(gt_tasks)
+        for task in tasks:
             data_to_plot.update(
                 {
                     **self.visualizers[task].visualize(

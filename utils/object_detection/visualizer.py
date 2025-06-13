@@ -135,8 +135,8 @@ class Visualizer(VisualizerStrategy):
     def _visualize_3d_bev(
         self, pred: torch.Tensor, gt: torch.Tensor, image_shape: tuple[int, int]
     ) -> np.ndarray:
-        C, H, W = image_shape
-        image = np.zeros((H, W, C))  # (80, 90))
+        C, _, W = image_shape
+        image = np.zeros((W, W, C))  # (80, 90))
         pred_boxes_bev = project_3d_boxes_to_bev(boxes_3d_info=pred).numpy()
         gt_boxes_bev = project_3d_boxes_to_bev(boxes_3d_info=gt).numpy()
 
@@ -152,10 +152,10 @@ class Visualizer(VisualizerStrategy):
             """
 
             # x: [-40, 40] -> [0, 80]
-            v = (((x + 40) / 80.0) * (H - 1)).astype(np.int32)
+            v = (((x + 40) / 80.0) * (W - 1)).astype(np.int32)
             # z: [0, 90]
             u = ((z / 90.0) * W).astype(np.int32)
-            v = np.clip(v, 0, H)
+            v = np.clip(v, 0, W)
             u = np.clip(u, 0, W)
 
             return u, v

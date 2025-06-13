@@ -247,7 +247,7 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         pred_deltas = pred_deltas.view(-1, self.num_classes, 4)
         pred_deltas_pos_per_class = pred_deltas[pos_sample, pos_gt_labels]
         proposals_pos = proposals[pos_sample]
-        gt_bounding_boxes_per_pred = gt_bounding_boxes[pos_gt_labels]
+        gt_bounding_boxes_per_pred = gt_bounding_boxes[gt_indices[pos_sample]]
         gt_deltas_per_pred = get_deltas_from_bounding_boxes(
             reference_boxes=gt_bounding_boxes_per_pred,
             predicted_boxes=proposals_pos,
