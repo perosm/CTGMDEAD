@@ -39,7 +39,7 @@ def eval(
     )
 
     losses = configure_loss(args["loss"])
-    loss_aggregator.num_batches = len(eval_dataloader)
+    loss_aggregator.num_batches_total = len(eval_dataloader)
 
     metrics = configure_metrics(args["metrics"])
     metrics_aggregator = MetricsAggregator(

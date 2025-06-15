@@ -488,16 +488,19 @@ def remove_dummy_ground_truth(
     filtered_data = defaultdict()
     for task, value in data.items():
         if isinstance(value, torch.Tensor):
-            _check_ground_truth_validity(
+            valid = _check_ground_truth_validity(
                 data=filtered_data, task=task, ground_truth=value
             )
         elif isinstance(value, dict):
             subdict = {}
             for subkey, subvalue in value.items():
-                _check_ground_truth_validity(
+                valid = _check_ground_truth_validity(
                     data=subdict, task=subkey, ground_truth=subvalue
                 )
-            filtered_data[task] = subdict
+                if not valid:
+                    break
+            if valid:
+                filtered_data[task] = subdict
 
     return filtered_data
 
@@ -509,3 +512,6 @@ def _check_ground_truth_validity(
 ) -> None:
     if not torch.any(torch.isnan(ground_truth)):
         data[task] = ground_truth
+        return True
+
+    return False

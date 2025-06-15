@@ -44,7 +44,7 @@ class LossSaver(Saver):
         total_loss = np.zeros(self.aggregator.epochs)
         fig, ax = plt.subplots(len(task_loss_per_epoch.keys()) + 1, 1, figsize=(16, 10))
         for row, (task, losses) in enumerate(task_loss_per_epoch.items()):
-            total_loss_per_task = np.zeros(self.aggregator.epochs)
+            total_loss_per_task = np.zeros(self.aggregator.epoch_cnt)
             for loss_name, loss_value in losses.items():
                 ax[row + 1].plot(
                     epochs_array,

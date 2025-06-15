@@ -218,7 +218,7 @@ class RCNNCrossEntropyAndRegressionLoss(nn.Module):
         neg_proposal_indices = torch.where(negative_mask)[0]
 
         # Balanced sampling
-        num_pos = self.positives_ratio * self.n_cls
+        num_pos = int(self.positives_ratio * self.n_cls)
         num_pos = min(num_pos, pos_proposal_indices.numel())
         num_neg = int(num_pos / self.positives_ratio * self.negatives_ratio)
         num_neg = min(num_neg, neg_proposal_indices.numel())

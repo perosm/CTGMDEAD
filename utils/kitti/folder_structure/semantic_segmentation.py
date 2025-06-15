@@ -14,7 +14,7 @@ INFO_DICT = {
     "00": "2011_10_03_drive_0027-000000-004540",
     "01": "2011_10_03_drive_0042-000000-001100",
     "02": "2011_10_03_drive_0034-000000-004660",
-    "03": "2011_09_26_drive_0067-000000-000800",
+    # "03": "2011_09_26_drive_0067-000000-000800", This sequence does not exist in raw data
     "04": "2011_09_30_drive_0016-000000-000270",
     "05": "2011_09_30_drive_0018-000000-002760",
     "06": "2011_09_30_drive_0020-000000-001100",
@@ -63,6 +63,8 @@ def main():
     destination_root_folder = args.new_data_semantic_segmentation_labels
     for semseg_label_path in semantic_segmentations_label_paths:
         sequence_number, frame_number = semseg_label_path.stem.split("_")
+        if sequence_number not in INFO_DICT.keys():
+            continue
         sequence_name, start_frame_number, end_frame_number = INFO_DICT[
             sequence_number
         ].split("-")

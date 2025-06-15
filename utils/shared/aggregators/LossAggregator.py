@@ -61,4 +61,12 @@ class LossAggregator(Aggregator):
         self.epoch_cnt += 1
 
     def return_aggregated(self) -> dict[str, dict[str, torch.Tensor]]:
-        return self.task_losses_per_epochs
+        return {
+            task: {
+                loss.__class__.__name__: loss_value_per_epochs[: self.epoch_cnt]
+                for loss, loss_value_per_epochs in self.task_losses_per_epochs[
+                    task
+                ].items()
+            }
+            for task in self.task_losses_per_epochs
+        }
