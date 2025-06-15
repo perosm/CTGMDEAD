@@ -1,6 +1,7 @@
 device: cuda
 dataset:
   dataset_name: KittiDataset
+  co_train: True # set to True since non overlapping examples do exist
   task_transform:
     input: 
       - Crop
@@ -10,6 +11,7 @@ dataset:
   task_paths:
     input: "./data/kitti/input" # "../../datasets/kitti_data/"
     road_detection: "./data/kitti/semantic_segmentation"
+    object_detection: "./data/kitti/object_detection/ground_truth"
   task_sample_list_path_train:
     road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
     object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"
@@ -27,22 +29,28 @@ early_stopping:
   patience: 5
   min_delta: 0.01
 
-epochs: 40
+epochs: 100
 
 model:
+  weights_file_path: # in this test we don't pretrain!
   encoder:
     name: ResNet18
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+  input_reconstruction_decoder:
+    name: UnetInputReconstructionDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 3
     freeze_epoch: 0
     unfreeze_epoch: -1
-    pretrained_regex: ["*"]
   depth_decoder:
     name: UnetDepthDecoder
     in_channels: 512
     channel_scale_factors: [2, 4, 8, 8]
     out_channels: 1
-    freeze_epoch: 0
-    unfreeze_epoch: -1
-    pretrained_regex: ["*"]
+    freeze_epoch: -1
+    unfreeze_epoch: 0
   road_detection_decoder:
     name: UnetRoadDetectionDecoder
     in_channels: 512
@@ -65,7 +73,7 @@ model:
       - iou_threshold: 0.7
       - pre_nms_filtering: 6000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
       - top_k_proposals_training: 256 # per fpn layer
-      - top_k_proposals_testing: 16 # per fpn layer
+      - top_k_proposals_testing: 8 # per fpn layer
       - anchor_generator:
         - sizes: [[64], [128], [256], [512]]
         - aspect_ratios: [0.5, 1, 2]
@@ -81,28 +89,33 @@ model:
       - score_threshold: 0.3
       - top_k_boxes_training: 256
       - top_k_boxes_testing: 2
-      - freeze_epoch: -1
-      - unfreeze_epoch: 0
+      - freeze_epoch: 0
+      - unfreeze_epoch: -1
     distance_head:
       - num_conv_layers: 1
       - num_channels: 256
       - num_fc_layers: 2
       - fc_features: 1024
-      - freeze_epoch: 0
-      - unfreeze_epoch: -1
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
     attribute_head:
       - num_conv_layers: 1
       - num_channels: 256
       - num_fc_layers: 2
       - fc_features: 1024
-      - freeze_epoch: 0
-      - unfreeze_epoch: -1
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
 
 prediction_postprocess: # used only in eval
+  - depth:
+    - min_depth: 0.0
+    - max_depth: 90.0
   - road_detection: # None
   - object_detection: # None
 
 loss:
+  input: # No loss
+  depth: # No loss
   road_detection:
     - BinaryCrossEntropyLoss:
       - lambda_factor: 1.0
@@ -125,8 +138,7 @@ loss:
 
 optimizer:
   name: Adam
-  lr: 1e-4
-
+  lr: 1e-5
 
 eval:
   dataloader:
@@ -135,6 +147,7 @@ eval:
     num_workers: 1
 
 metrics:
+  input: # 
   road_detection:
     - IoU
     - Precision
@@ -142,5 +155,8 @@ metrics:
     - FalsePositiveRate
     - TrueNegativeRate
     - F1Score
+  object_detection:
+    - mAP
+    # - mAP_BEV
 
 save_path: ../run_info/
