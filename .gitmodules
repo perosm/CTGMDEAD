@@ -1,0 +1,3 @@
+[submodule "dataset/nuscenes/extdeps"]
+	path = dataset/nuscenes/extdeps
+	url = https://github.com/nutonomy/nuscenes-devkit.git
