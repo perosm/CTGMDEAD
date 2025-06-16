@@ -71,7 +71,7 @@ from utils.road_detection.metrics import (
     F1Score,
 )
 from utils.object_detection.metrics import mAP
-from utils.object_detection_3d.metrics import mAP_BEV
+from utils.object_detection_3d.metrics import mAP_BEV, mAP_3D
 from utils.shared.visualizer import Visualizer
 from utils.input_reconstruction.visualizer import (
     Visualizer as InputReconstructionVisualizer,
@@ -463,6 +463,7 @@ def configure_metrics(metric_configs):
         mAP.__name__: mAP,
         # object detection 3D metrics
         mAP_BEV.__name__: mAP_BEV,
+        mAP_3D.__name__: mAP_3D,
     }
     task_metrics = {task: [] for task in metric_configs.keys()}
     for task in metric_configs.keys():

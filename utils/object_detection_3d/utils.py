@@ -2,6 +2,57 @@ import torch
 from torchvision.ops import box_iou
 
 
+def get_corners(boxes_3d_info: torch.Tensor) -> torch.Tensor:
+    """
+    Extracts the center of the object in camera coordinate system and it's height, width and length,
+    Calculates the eigth vertices of the 3D bounding box.
+
+    Args:
+        - boxes_3d_info: Bounding box info in the form of (num_objects, 7).
+
+    Returns:
+        - Corners of the bounding box in the order as pictured below of shape (num_objects, 3, 8).
+
+       (5)-----(4)
+       /|       /|
+      / |      / |
+    (6)-----(7)  |
+     |  |    |   |
+     | (1)---|--(0)
+     | /     |  /
+     |/      | /
+    (2)-----(3)
+    """
+    num_objects = boxes_3d_info.shape[0]
+    h, w, l = boxes_3d_info[:, 0:3].T
+    x, y, z = boxes_3d_info[:, 3:6].T
+    rotation_y = boxes_3d_info[:, 6]
+    zeros = torch.zeros(num_objects, device=boxes_3d_info.device)
+    ones = torch.ones(num_objects, device=boxes_3d_info.device)
+    R = torch.stack(
+        [
+            torch.stack([torch.cos(rotation_y), zeros, torch.sin(rotation_y)], dim=0),
+            torch.stack([zeros, ones, zeros], dim=0),
+            torch.stack([-torch.sin(rotation_y), zeros, torch.cos(rotation_y)], dim=0),
+        ],
+        dim=0,
+    ).permute(2, 0, 1)
+    x_corners = torch.stack(
+        [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2], dim=1
+    )
+    y_corners = torch.stack([zeros, zeros, zeros, zeros, -h, -h, -h, -h], dim=1)
+    z_corners = torch.stack(
+        [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2], dim=1
+    )
+    corners = torch.stack([x_corners, y_corners, z_corners], dim=1)
+    corners = torch.einsum("nij,njk->nik", R, corners)
+    corners[:, 0] += x.unsqueeze(1)
+    corners[:, 1] += y.unsqueeze(1)
+    corners[:, 2] += z.unsqueeze(1)
+
+    return corners
+
+
 def project_3d_boxes_to_image(
     boxes_3d_info: torch.Tensor, projection_matrix: torch.Tensor
 ) -> torch.Tensor:
@@ -106,11 +157,8 @@ def project_3d_boxes_to_bev(boxes_3d_info: torch.Tensor) -> torch.Tensor:
     bottom_corners[:, 0] += x.unsqueeze(1)
     bottom_corners[:, 1] += y.unsqueeze(1)
     bottom_corners[:, 2] += z.unsqueeze(1)
-    x_left = bottom_corners[:, 0, 1]
-    y_top = bottom_corners[:, 2, 1]
-    x_right = bottom_corners[:, 0, 3]
-    y_bottom = bottom_corners[:, 2, 3]
-    return torch.stack((x_left, y_top, x_right, y_bottom), dim=1)
+
+    return torch.stack((bottom_corners[:, 0], bottom_corners[:, 2]), dim=1)
 
 
 def project_3d_points_to_image(
