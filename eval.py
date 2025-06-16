@@ -1,3 +1,6 @@
+import argparse
+import pathlib
+
 import torch
 from torch import nn
 from tqdm import tqdm
@@ -11,6 +14,8 @@ from utils.shared.utils import (
     prepare_save_directories,
     move_data_to_gpu,
     configure_visualizers,
+    configure_model,
+    load_yaml_file,
 )
 from utils.shared.aggregators.LossAggregator import LossAggregator
 from utils.shared.savers.LossSaver import LossSaver
@@ -71,10 +76,65 @@ def eval(
 
             per_batch_task_metrics = metrics(pred, data)
             metrics_aggregator.aggregate_per_batch(per_batch_task_metrics)
-        early_stopping(loss_aggregator.total_loss_per_epochs[epoch].item())
+
+        if early_stopping:
+            early_stopping(loss_aggregator.total_loss_per_epochs[epoch].item())
 
     metrics_saver.save()
-    model_saver(model, metrics_aggregator.task_metrics_per_epochs)
+    if model_saver:
+        model_saver(model, metrics_aggregator.task_metrics_per_epochs)
     visualizers.plot_visualizations(pred=pred, gt=data, image=data["input"])
 
     return
+
+
+def main():
+    args = _parse_args()
+
+    # Load .yaml config file
+    config_file_path = args.config_file_path
+    config_file = load_yaml_file(config_file_path)
+    device = config_file["device"]
+
+    # Using save_path and .yaml file name fetch model weights
+    save_dir = config_file["save_path"]
+    config_filename = config_file_path.stem
+    config_file.update({"name": config_filename})
+    model_weights_path = pathlib.Path(save_dir, config_filename, "best_model.pth")
+    config_file["model"].update({"weights_file_path": model_weights_path})
+    model = configure_model(config_file["model"], device).to(device)
+
+    # Initialize loss aggregator
+    losses = configure_loss(config_file["loss"])
+    loss_aggregator = LossAggregator(
+        task_losses=losses.task_losses,
+        epochs=1,
+        num_batches_total=1,
+    )
+    eval(
+        args=config_file,
+        model=model,
+        epoch=None,
+        early_stopping=None,
+        loss_aggregator=loss_aggregator,
+        model_saver=None,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-cfp",
+        "--config-file-path",
+        type=pathlib.Path,
+        default=pathlib.Path(
+            "./configs/configs_info/00_ResNet18_kitti_depth_estimation.yaml"
+        ),
+        help="Path to config file.",
+    )
+
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    main()

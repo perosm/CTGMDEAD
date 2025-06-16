@@ -2,6 +2,7 @@ import os
 import re
 import pathlib
 import logging
+import yaml
 from typing import Any
 from collections import defaultdict
 
@@ -83,6 +84,37 @@ from utils.shared.dict_utils import list_of_dict_to_dict
 NUM_CLASSES = 4
 
 
+############################## CONFIG UTILS ###############
+def read_configs_txt_file(filepath: pathlib.Path) -> list[str]:
+    with open(filepath) as f:
+        return [line.strip() for line in f.readlines()]
+
+
+def find_configs_yaml_file(
+    configs_directory: pathlib.Path, config_numbers: list[str]
+) -> pathlib.Path:
+    wanted_config_number = config_numbers[0]
+    if configs_directory.is_dir():
+        for yaml_file in configs_directory.iterdir():
+            curr_config_number = yaml_file.parts[-1].split("_")[0]
+            if wanted_config_number == curr_config_number:
+                return yaml_file
+
+
+def load_yaml_file(yaml_file: pathlib.Path) -> dict:
+    with open(yaml_file.absolute()) as file:
+        try:
+            return yaml.safe_load(file)
+        except yaml.YAMLError as exception:
+            print(exception)
+
+
+def write_configs_txt_file(path_to_file: pathlib.Path, lines: list[str]) -> None:
+    with open(path_to_file, "w") as f:
+        f.writelines(f"{line}\n" for line in lines)
+
+
+############################## CONFIG UTILS ##############################
 def prepare_save_directories(args: dict, subfolder_name="train") -> None:
     save_dir = pathlib.Path(
         os.path.join(args["save_path"], args["name"], subfolder_name)
@@ -93,7 +125,6 @@ def prepare_save_directories(args: dict, subfolder_name="train") -> None:
     return save_dir
 
 
-############################## CONFIG UTILS ##############################
 def configure_dataset(dataset_configs: dict[str, str | list], mode: str) -> Dataset:
     dataset_dict = {
         KittiDataset.__name__: KittiDataset(
