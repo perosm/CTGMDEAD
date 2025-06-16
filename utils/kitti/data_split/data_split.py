@@ -150,7 +150,37 @@ def split_dataset(
             date_drive_sample_list=permuted_depth_date_drive_sample_list,
         )
     )
+    # If samples are overlapping between depth train and objdet/semseg train
+    # we remove them from depth train and keep them inside objdet/semseg train
+    # 1) Semantic segmentation and depth
+    (
+        depth_date_drive_sample_list_train,
+        semseg_date_drive_sample_list_train,
+        date_drive_overlapping_samples,
+    ) = _remove_ovelapping_samples(
+        date_drive_sample_list_train=depth_date_drive_sample_list_train,
+        date_drive_sample_list_val=semseg_date_drive_sample_list_train,
+    )
 
+    semseg_date_drive_sample_list_train = _add_overlapping_samples(
+        date_drive_sample_list=semseg_date_drive_sample_list_train,
+        date_drive_overlapping_samples=date_drive_overlapping_samples,
+    )
+
+    # 2) Object detection and depth
+    (
+        depth_date_drive_sample_list_train,
+        objdet_date_drive_sample_list_train,
+        date_drive_overlapping_samples,
+    ) = _remove_ovelapping_samples(
+        date_drive_sample_list_train=depth_date_drive_sample_list_train,
+        date_drive_sample_list_val=objdet_date_drive_sample_list_train,
+    )
+
+    objdet_date_drive_sample_list_train = _add_overlapping_samples(
+        date_drive_sample_list=objdet_date_drive_sample_list_train,
+        date_drive_overlapping_samples=date_drive_overlapping_samples,
+    )
     # If samples between are overlapping we move them to from train to validation
     # 1) depth train and semantic segmentation validation
     (
@@ -260,6 +290,14 @@ def split_dataset(
         date_drive_sample_list=objdet_date_drive_sample_list_val
     )
 
+    assert (
+        set(depth_sample_list_train).intersection(set(semseg_sample_list_train))
+        == set()
+    ), f"Intersection between depth_sample_list_train and semseg_sample_list_train should be empty!"
+    assert (
+        set(depth_sample_list_train).intersection(set(objdet_sample_list_train))
+        == set()
+    ), f"Intersection between depth_sample_list_train and objdet_sample_list_train should be empty!"
     assert (
         set(depth_sample_list_train).intersection(set(depth_sample_list_val)) == set()
     ), f"Intersection between depth_sample_list_train and depth_sample_list_val should be empty!"

@@ -20,7 +20,7 @@ class LossAggregator(Aggregator):
         self.num_batches_total = num_batches_total
         self.per_task_num_batches_count = {task: 0 for task in task_losses.keys()}
         self.total_loss_per_epochs = np.zeros(epochs)
-        self.task_losses_per_epochs: dict[str, dict[str, list[float]]] = {
+        self.task_losses_per_epochs: dict[str, dict[str, np.ndarray]] = {
             task: {
                 loss.__class__.__name__: np.zeros(epochs) for loss in task_losses[task]
             }
@@ -63,7 +63,7 @@ class LossAggregator(Aggregator):
     def return_aggregated(self) -> dict[str, dict[str, torch.Tensor]]:
         return {
             task: {
-                loss.__class__.__name__: loss_value_per_epochs[: self.epoch_cnt]
+                loss: loss_value_per_epochs[: self.epoch_cnt]
                 for loss, loss_value_per_epochs in self.task_losses_per_epochs[
                     task
                 ].items()

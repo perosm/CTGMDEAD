@@ -7,8 +7,8 @@ class IoU(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.threshold = 0.5
         self.eval()
+        self.threshold = 0.5
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         pred = (pred > self.threshold).bool()
@@ -24,9 +24,9 @@ class Precision(nn.Module):
 
     def __init__(self):
         super().__init__()
+        self.eval()
         self.threshold = 0.5
         self.epsilon = 1e-5
-        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         pred = (pred > self.threshold).bool()
@@ -42,8 +42,8 @@ class Recall(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.threshold = 0.5
         self.eval()
+        self.threshold = 0.5
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         pred = (pred > self.threshold).bool()
@@ -59,8 +59,8 @@ class FalsePositiveRate(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.threshold = 0.5
         self.eval()
+        self.threshold = 0.5
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         pred = (pred > self.threshold).bool()
@@ -76,8 +76,8 @@ class TrueNegativeRate(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.threshold = 0.5
         self.eval()
+        self.threshold = 0.5
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         pred = (pred > self.threshold).bool()
@@ -93,9 +93,9 @@ class F1Score(nn.Module):
 
     def __init__(self):
         super().__init__()
+        self.eval()
         self.threshold = 0.5
         self.epsilon = 1e-5
-        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         pred = (pred > self.threshold).bool()

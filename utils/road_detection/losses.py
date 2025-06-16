@@ -6,8 +6,8 @@ class BinaryCrossEntropyLoss(nn.Module):
 
     def __init__(self, **kwargs):
         super().__init__()
-        self.lambda_factor = kwargs.get("lambda_factor", 1.0)
+        self.scale_factor = kwargs.get("scale_factor", 1.0)
         self.loss = nn.BCELoss(reduction="mean")
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
-        return self.loss(pred, gt)
+        return self.scale_factor * self.loss(pred, gt)

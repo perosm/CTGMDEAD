@@ -13,8 +13,8 @@ class MaskedAverageRelativeError(nn.Module):
     higher = False
 
     def __init__(self):
-        self.eval()
         super().__init__()
+        self.eval()
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         mask = torch.where(gt != 0, 1, 0).to(DEVICE)
@@ -24,7 +24,7 @@ class MaskedAverageRelativeError(nn.Module):
         masked_avg_rel_error = (
             (torch.abs(pred - gt) / gt).sum((2, 3)) / valid_points
         ).mean()
-        return masked_avg_rel_error.cpu().item()
+        return masked_avg_rel_error
 
 
 class MaskedRMSE(nn.Module):
@@ -43,7 +43,7 @@ class MaskedRMSE(nn.Module):
             ((mask * pred - gt) ** 2).sum((2, 3)) / valid_points
         ).mean()
 
-        return masked_rmse.cpu().item()
+        return masked_rmse
 
 
 class MaskedThresholdAccracy(nn.Module):
@@ -53,8 +53,8 @@ class MaskedThresholdAccracy(nn.Module):
 
     def __init__(self, threshold: float = 1.25):
         super().__init__()
-        self.threshold = threshold
         self.eval()
+        self.threshold = threshold
 
     def forward(self, pred, gt) -> torch.Tensor:
         mask = torch.where(gt != 0, 1, 0).to(DEVICE)
@@ -68,7 +68,7 @@ class MaskedThresholdAccracy(nn.Module):
             masked_threshold_accuracy.float().sum() / valid_points
         )
 
-        return masked_threshold_accuracy.cpu().item()
+        return masked_threshold_accuracy
 
 
 class MaskedMeanAbsoluteError(nn.Module):
@@ -85,4 +85,4 @@ class MaskedMeanAbsoluteError(nn.Module):
         valid_points = mask.sum()
         masked_mae = (torch.abs((mask * pred - gt)).sum((2, 3)) / valid_points).mean()
 
-        return masked_mae.cpu().item()
+        return masked_mae

@@ -39,12 +39,13 @@ class LossSaver(Saver):
         return task_loss_per_epoch_serializable
 
     def save_plot(self) -> None:
+        last_epoch = self.aggregator.epoch_cnt
         task_loss_per_epoch = self.aggregator.return_aggregated()
-        epochs_array = np.arange(0, self.aggregator.epochs)
-        total_loss = np.zeros(self.aggregator.epochs)
+        epochs_array = np.arange(0, last_epoch)
+        total_loss = np.zeros(last_epoch)
         fig, ax = plt.subplots(len(task_loss_per_epoch.keys()) + 1, 1, figsize=(16, 10))
         for row, (task, losses) in enumerate(task_loss_per_epoch.items()):
-            total_loss_per_task = np.zeros(self.aggregator.epoch_cnt)
+            total_loss_per_task = np.zeros(last_epoch)
             for loss_name, loss_value in losses.items():
                 ax[row + 1].plot(
                     epochs_array,
@@ -53,7 +54,7 @@ class LossSaver(Saver):
                 )
                 ax[row + 1].set_title(task)
                 ax[row + 1].legend()
-                total_loss_per_task += loss_value
+                total_loss_per_task += loss_value[:last_epoch]
             total_loss += total_loss_per_task
             ax[0].plot(epochs_array, total_loss_per_task, label=task)
         ax[0].plot(epochs_array, total_loss)

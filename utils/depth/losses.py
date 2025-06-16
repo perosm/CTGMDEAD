@@ -10,7 +10,7 @@ class MaskedMAE(nn.Module):
 
     def __init__(self, **kwargs):
         super().__init__()
-        self.lambda_factor = kwargs.get("lambda_factor", 1.0)
+        self.scale_factor = kwargs.get("scale_factor", 1.0)
         self._l1_loss = nn.L1Loss(reduction="none")
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor):

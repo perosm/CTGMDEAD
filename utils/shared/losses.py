@@ -24,7 +24,7 @@ class MultiTaskLoss(nn.Module):
         pred_tasks = set(pred.keys())
         tasks = gt_tasks.intersection(pred_tasks)
         for task in tasks:
-            if self.task_losses[task]:  # quick fix to autoencoder structure
+            if self.task_losses.get(task, None):  # quick fix to autoencoder structure
                 for loss in self.task_losses[task]:
                     per_task_losses[task][loss.__class__.__name__] = loss(
                         pred[task], gt[task]

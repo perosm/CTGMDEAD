@@ -106,8 +106,11 @@ def project_3d_boxes_to_bev(boxes_3d_info: torch.Tensor) -> torch.Tensor:
     bottom_corners[:, 0] += x.unsqueeze(1)
     bottom_corners[:, 1] += y.unsqueeze(1)
     bottom_corners[:, 2] += z.unsqueeze(1)
-
-    return torch.stack((bottom_corners[:, 0], bottom_corners[:, 2]), dim=1)
+    x_left = bottom_corners[:, 0, 1]
+    y_top = bottom_corners[:, 2, 1]
+    x_right = bottom_corners[:, 0, 3]
+    y_bottom = bottom_corners[:, 2, 3]
+    return torch.stack((x_left, y_top, x_right, y_bottom), dim=1)
 
 
 def project_3d_points_to_image(

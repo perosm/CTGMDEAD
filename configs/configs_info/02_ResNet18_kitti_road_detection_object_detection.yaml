@@ -114,11 +114,9 @@ prediction_postprocess: # used only in eval
   - object_detection: # None
 
 loss:
-  input: # No loss
-  depth: # No loss
   road_detection:
     - BinaryCrossEntropyLoss:
-      - lambda_factor: 1.0
+      - scale_factor: 1.0
   object_detection: 
     - RPNClassificationAndRegressionLoss:
       - scale_factor: 1
@@ -147,7 +145,6 @@ eval:
     num_workers: 1
 
 metrics:
-  input: # 
   road_detection:
     - IoU
     - Precision

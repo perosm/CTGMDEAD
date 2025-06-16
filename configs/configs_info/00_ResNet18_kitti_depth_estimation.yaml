@@ -77,7 +77,7 @@ eval:
 metrics:
   input:
     - MSE
-    - SSIM
+    # - SSIM # TODO: implement SSIM
   depth:
     - MaskedMAE
     - MaskedAverageRelativeError

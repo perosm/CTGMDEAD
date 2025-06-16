@@ -5,22 +5,17 @@ dataset:
   task_transform:
     input: 
       - Crop
-    # depth:
-    #   - Crop
     road_detection:
       - Crop
     object_detection:
   task_paths:
-    # depth: "./data/kitti/depth" # for visualization purposes
     input: "./data/kitti/input" # "../../datasets/kitti_data/"
     road_detection: "./data/kitti/semantic_segmentation"
     object_detection: "./data/kitti/object_detection/ground_truth"
   task_sample_list_path_train:
-    # depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
     road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
     object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"
   task_sample_list_path_val:
-    # depth: "./data/kitti/sample_lists/val/depth_sample_list.txt" # for visualization purposes
     road_detection: "./data/kitti/sample_lists/val/semseg_sample_list.txt"
     object_detection: "./data/kitti/sample_lists/val/objdet_sample_list.txt"
 
@@ -121,11 +116,9 @@ prediction_postprocess: # used only in eval
   - object_detection: # None
 
 loss:
-  input: # 
-  depth:
   road_detection:
     - BinaryCrossEntropyLoss:
-      - lambda_factor: 1.0
+      - scale_factor: 1.0
   object_detection: 
     - RPNClassificationAndRegressionLoss:
       - scale_factor: 1
@@ -154,7 +147,6 @@ eval:
     num_workers: 1
 
 metrics:
-  input: # 
   road_detection:
     - IoU
     - Precision
