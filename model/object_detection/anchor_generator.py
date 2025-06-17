@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from utils.shared.train_utils import DEVICE
 
 """
 Code used official pytorch implementation from https://github.com/pytorch/vision/blob/main/torchvision/models/detection/anchor_utils.py.
@@ -61,7 +62,7 @@ class AnchorGenerator(nn.Module):
         scales: list[int],
         aspect_ratios: list[float],
         dtype: torch.dtype = torch.float32,
-        device: torch.device = torch.device("cpu"),
+        device: torch.device = DEVICE,
     ) -> torch.Tensor:
         scales = torch.as_tensor(scales, dtype=dtype, device=device)
         aspect_ratios = torch.as_tensor(aspect_ratios, dtype=dtype, device=device)

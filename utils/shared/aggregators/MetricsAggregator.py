@@ -2,6 +2,7 @@ import torch
 from torch import nn
 
 from utils.shared.aggregators.Aggregator import Aggregator
+from utils.shared.train_utils import DEVICE
 
 
 class MetricsAggregator(Aggregator):
@@ -10,7 +11,7 @@ class MetricsAggregator(Aggregator):
         self,
         task_metrics: dict[str, list[nn.Module]],
         num_batches_total: int,
-        device: str = "cpu",
+        device: str = DEVICE,
     ):
         self.batch_cnt = 0
         self.num_batches = num_batches_total

@@ -1,8 +1,6 @@
 import pathlib
 import argparse
-import yaml
 import train
-import eval
 
 DEFAULT_YAML = "default.yaml"
 CONFIGS_INFO_DIR = "configs_info"
@@ -14,6 +12,7 @@ from utils.shared.utils import (
     find_configs_yaml_file,
     load_yaml_file,
     write_configs_txt_file,
+    save_yaml_file,
 )
 
 
@@ -32,6 +31,8 @@ def main():
         config_yaml = load_yaml_file(config_yaml_path.absolute())
         config_yaml.update({"name": config_yaml_path.stem})
         default_yaml.update(config_yaml)
+        yaml_save_path = pathlib.Path(config_yaml["save_path"])
+        save_yaml_file(yaml_save_path, config_yaml)
 
         train.train(config_yaml)
 

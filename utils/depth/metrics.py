@@ -1,10 +1,10 @@
 import torch
 from torch import nn
+from utils.shared.train_utils import DEVICE
 
 """
 Pictures are evaluated with batch size 1.
 """
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class MaskedAverageRelativeError(nn.Module):

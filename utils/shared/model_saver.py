@@ -53,7 +53,7 @@ class ModelSaver:
                         else -1
                     )
 
-        if cnt > 0:
+        if cnt >= 0:
             self._save_model(model, self.save_dir / "best_model.pth")
 
     def _save_model(self, model: nn.Module, path: str):

@@ -6,15 +6,17 @@ from collections import defaultdict
 
 from utils.shared.aggregators.LossAggregator import LossAggregator
 from utils.shared.savers.Saver import Saver
+from utils.shared.train_utils import DEVICE
 
 
 class LossSaver(Saver):
+
     def __init__(
         self,
         loss_aggregator: LossAggregator,
         save_dir: pathlib.Path,
         mode: str = "train",
-        device="cpu",
+        device: str = DEVICE,
     ):
         super().__init__(loss_aggregator, save_dir)
         self.device = device

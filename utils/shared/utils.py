@@ -82,6 +82,7 @@ from utils.road_detection.visualizer import Visualizer as RoadVisualizer
 from utils.shared.dict_utils import list_of_dict_to_dict
 
 NUM_CLASSES = 4
+DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
 ############################## CONFIG UTILS ###############
@@ -99,6 +100,14 @@ def find_configs_yaml_file(
             curr_config_number = yaml_file.parts[-1].split("_")[0]
             if wanted_config_number == curr_config_number:
                 return yaml_file
+
+
+def save_yaml_file(path: pathlib.Path, yaml_file: dict) -> None:
+    yaml_filename = yaml_file["name"]
+    folder_path = path / yaml_filename
+    folder_path.mkdir(parents=True, exist_ok=True)
+    with open(folder_path / f"{yaml_filename}.yaml", "w") as file:
+        yaml.dump(yaml_file, file)
 
 
 def load_yaml_file(yaml_file: pathlib.Path) -> dict:

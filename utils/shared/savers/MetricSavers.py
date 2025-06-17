@@ -5,6 +5,7 @@ import json
 
 from utils.shared.aggregators.MetricsAggregator import MetricsAggregator
 from utils.shared.savers.Saver import Saver
+from utils.shared.train_utils import DEVICE
 
 
 class MetricsSaver(Saver):
@@ -14,7 +15,7 @@ class MetricsSaver(Saver):
         metrics_aggregator: MetricsAggregator,
         save_dir: pathlib.Path,
         name: str,
-        device: str = "cuda",
+        device: str = DEVICE,
     ):
         super().__init__(metrics_aggregator, save_dir)
         self.device = device
