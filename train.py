@@ -1,4 +1,3 @@
-import torch
 import logging
 import eval
 
@@ -49,7 +48,11 @@ def train(args: dict):
     loss_saver = LossSaver(
         loss_aggregator=loss_aggregator, save_dir=train_save_dir, device=device
     )
-    early_stopping = EarlyStopping(**args["early_stopping"])
+    early_stopping = (
+        EarlyStopping(**args["early_stopping"])
+        if args.get("early_stopping", None)
+        else None
+    )
     # val specific stuff
     model_saver = ModelSaver(
         save_dir=val_save_dir.parent,
@@ -81,7 +84,7 @@ def train(args: dict):
             f"epoch {epoch}: loss={loss_aggregator.total_loss_per_epochs[epoch].item()}",
         )
         eval.eval(args, model, epoch, early_stopping, val_loss_aggregator, model_saver)
-        if early_stopping.early_stop:
+        if early_stopping and early_stopping.early_stop:
             logger.log(logging.INFO, f"Early stopping at epoch {epoch}!")
             break
 

@@ -221,11 +221,7 @@ def _configure_decoder(decoder_configs: dict) -> nn.Module:
     if not decoder_configs:
         return None
 
-    return decoder_dict[decoder_configs["name"]](
-        decoder_configs["in_channels"],
-        decoder_configs["channel_scale_factors"],
-        decoder_configs["out_channels"],
-    )
+    return decoder_dict[decoder_configs["name"]](**decoder_configs)
 
 
 def _configure_necks_and_heads(

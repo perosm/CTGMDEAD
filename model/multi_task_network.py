@@ -31,11 +31,20 @@ class MultiTaskNetwork(nn.Module):
         task_outputs = {}
         encoder_outputs = self.encoder(x)
 
-        fpn_outputs, task_outputs[TaskEnum.input] = self.input_reconstruction_decoder(
-            encoder_outputs
-        )
+        if self.input_reconstruction_decoder.main_decoder:
+            fpn_outputs, task_outputs[TaskEnum.input] = (
+                self.input_reconstruction_decoder(encoder_outputs)
+            )
+        else:
+            task_outputs[TaskEnum.input] = self.input_reconstruction_decoder(
+                encoder_outputs
+            )
 
-        if self.depth_decoder:
+        if self.depth_decoder.main_decoder:
+            fpn_outputs, task_outputs[TaskEnum.depth] = self.depth_decoder(
+                encoder_outputs
+            )
+        else:
             task_outputs[TaskEnum.depth] = self.depth_decoder(encoder_outputs)
 
         if self.road_detection_decoder:
