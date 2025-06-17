@@ -31,7 +31,7 @@ model:
   weights_file_path:
   encoder:
     name: ResNet18
-    pretrained: True
+    pretrained: False
     freeze_epoch: -1
     unfreeze_epoch: 0
   input_reconstruction_decoder:
@@ -39,6 +39,7 @@ model:
     in_channels: 512
     channel_scale_factors: [2, 4, 8, 8]
     out_channels: 3
+    main_decoder: True
     freeze_epoch: -1
     unfreeze_epoch: 0
   depth_decoder:
@@ -46,6 +47,7 @@ model:
     in_channels: 512
     channel_scale_factors: [2, 4, 8, 8]
     out_channels: 1
+    main_decoder: False
     freeze_epoch: -1
     unfreeze_epoch: 0
 
@@ -82,7 +84,6 @@ metrics:
     - MaskedMAE
     - MaskedAverageRelativeError
     - MaskedRMSE
-    - MaskedThresholdAccracy
-    - MaskedMeanAbsoluteError
+    - MaskedThresholdAccracy  
 
 save_path: ../run_info/

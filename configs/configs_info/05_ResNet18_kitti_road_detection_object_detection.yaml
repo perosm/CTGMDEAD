@@ -37,19 +37,19 @@ model:
     name: ResNet18
     freeze_epoch: -1
     unfreeze_epoch: 0
-  input_reconstruction_decoder:
-    name: UnetInputReconstructionDecoder
-    in_channels: 512
-    channel_scale_factors: [2, 4, 8, 8]
-    out_channels: 3
-    main_decoder: True
-    freeze_epoch: -1
-    unfreeze_epoch: 0
   depth_decoder:
     name: UnetDepthDecoder
     in_channels: 512
     channel_scale_factors: [2, 4, 8, 8]
     out_channels: 1
+    main_decoder: True
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+  input_reconstruction_decoder:
+    name: UnetInputReconstructionDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 3
     main_decoder: False
     freeze_epoch: -1
     unfreeze_epoch: 0
@@ -91,8 +91,8 @@ model:
       - score_threshold: 0.3
       - top_k_boxes_training: 256
       - top_k_boxes_testing: 2
-      - freeze_epoch: -1
-      - unfreeze_epoch: 0
+      - freeze_epoch: 0
+      - unfreeze_epoch: -1
     distance_head:
       - num_conv_layers: 1
       - num_channels: 256
@@ -156,6 +156,7 @@ metrics:
     - F1Score
   object_detection:
     - mAP
-    # - mAP_BEV
+    - mAP_BEV
+    - mAP_3D
 
 save_path: ../run_info/
