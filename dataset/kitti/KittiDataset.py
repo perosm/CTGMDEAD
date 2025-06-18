@@ -118,7 +118,11 @@ class KittiDataset(Dataset):
         if projection_matrix is not None:
             return projection_matrix
 
-        date = frame.parts[0]
+        date = (
+            frame.parts[0]
+            if TaskEnum.object_detection in self.task_root_dir_path.keys()
+            else frame.parts[-1]
+        )
         projection_matrix_by_date = (
             self.task_root_dir_path[TaskEnum.input] / date / "calib_cam_to_cam.txt"
         )
