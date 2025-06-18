@@ -5,6 +5,7 @@ dataset:
   task_transform:
     input: 
       - Crop
+      - Divide
     depth:
       - Crop
   task_paths:

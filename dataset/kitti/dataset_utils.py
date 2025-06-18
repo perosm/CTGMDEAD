@@ -197,6 +197,12 @@ class CropImage(object):
         return F.crop(img, self.top, self.left, self.height, self.width)
 
 
+class Divide(object):
+    def __call__(self, img: torch.Tensor) -> torch.Tensor:
+        """Divides image by 255.0"""
+        return img / 255.0
+
+
 def task_tranform_mapping(task_transforms_list: dict[str, str]) -> dict[str, list]:
     """
     Pairs strings from .yaml file to torch transforms accordingly.
@@ -207,6 +213,7 @@ def task_tranform_mapping(task_transforms_list: dict[str, str]) -> dict[str, lis
     transforms_dict = {
         "Crop": CropImage(),
         "ToTensor": transforms.ToTensor(),
+        "Divide": Divide(),
     }
     task_transforms = {task: [] for task in task_transforms_list.keys()}
     for task in task_transforms_list.keys():

@@ -5,6 +5,7 @@ dataset:
   task_transform:
     input: 
       - Crop
+      - Divide
     road_detection:
       - Crop
     object_detection:
