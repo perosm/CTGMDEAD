@@ -1084,3 +1084,84 @@ class NuImages:
         if out_path is not None:
             plt.savefig(out_path, bbox_inches="tight", dpi=150, pad_inches=0)
             plt.close()
+
+
+if __name__ == "__main__":
+    # NuImages class holds several tables
+    # each table is a list of records
+    # each record is a dictionary
+    nuim = NuImages(
+        dataroot="./data/nuscenes/nuimages",
+        version="v1.0-mini",
+        verbose=True,
+        lazy=True,
+    )
+    ########## Tables ##########
+    # each table is a list of records (list of dictionaries)
+    # each record is a dictionary
+    print("NuImages categories:", nuim.category)
+
+    # list of all table names
+    print("NuImages tables:", nuim.table_names)
+
+    ########## Indexing ##########
+    # getting sample from a sample index
+    sample_idx = 0
+    sample = nuim.sample[sample_idx]
+    print("NuImages sample from sample index:", sample)
+
+    # getting sample record from sample token
+    sample = nuim.get("sample", sample["token"])
+    print("NuImages sample record from sample token:", sample)
+    sample_idx_check = nuim.getind("sample", sample["token"])
+    assert sample_idx == sample_idx_check
+
+    # From the sample we can dirrectly access the corresponding keyframe sample data
+    key_camera_token = sample["key_camera_token"]
+    print(key_camera_token)
+
+    ########## Rendering ##########
+    # with_category=True -> we can see the name of the category
+    # with_attributes=True -> to print attributes of each object when with_category=True
+    nuim.render_image(
+        key_camera_token,
+        annotation_type="all",
+        with_category=True,
+        with_attributes=True,
+        box_line_width=-1,
+        render_scale=5,
+    )
+
+    # we can see which annotations are in the image
+    object_tokens, surface_tokens = nuim.list_anns(sample["token"])
+    # rendering image but we only focus on first object and first surface annotation
+    nuim.render_image(
+        key_camera_token,
+        with_category=True,
+        object_tokens=[object_tokens[0]],
+        surface_tokens=[surface_tokens[0]],
+    )
+
+    # To get the raw data (i.e. segmentation masks, both semantic and instance, we can use get_segmentation())
+    semantic_mask, instance_mask = nuim.get_segmentation(key_camera_token)
+
+    plt.figure(figsize=(32, 9))
+
+    plt.subplot(1, 1, 1)
+    plt.imshow(semantic_mask)
+    plt.show()
+
+    # Every annotated image (keyframe) comes with up to 6 past and 6 future images
+    # list_sample_content() shows for each sample all the associated sample_datas.
+    print(nuim.list_sample_content(sample["token"]))
+
+    # Besides the annotated images, we can also render the 6 previous and 6 future images
+    # which are not annotated (this will not be used.)
+    next_camera_token = nuim.get("sample_data", key_camera_token)["next"]
+    print(next_camera_token)
+
+    # Since I did not downlaod non-keyframes (sweeps) this will throw error:
+    try:
+        nuim.render_image(next_camera_token, annotation_type="none")
+    except Exception as e:
+        print("As expected, we encountered this error:", e)
