@@ -19,5 +19,5 @@ class Visualizer(VisualizerStrategy):
             f"{self.task}_reconstructed": pred.squeeze()
             .permute(1, 2, 0)
             .numpy()
-            .astype(np.uint8)
+            .astype(np.float32)
         }

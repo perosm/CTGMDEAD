@@ -39,7 +39,7 @@ class Visualizer:
             .cpu()
             .permute(1, 2, 0)
             .numpy()
-            .astype(np.uint8)
+            .astype(np.float32)
         }
         pred_tasks = set(pred.keys())
         gt_tasks = set(gt.keys())
