@@ -14,9 +14,10 @@ class MaskedMAE(nn.Module):
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor):
         mask = torch.where(gt != 0, 1, 0).to(DEVICE)
-        valid_points = mask.sum()
-        loss = self._l1_loss(pred * mask, gt).sum((2, 3)) / valid_points
-        return loss.mean()
+        valid_points = mask.sum((2, 3))
+        loss = self._l1_loss(pred * mask, gt).sum((2, 3))
+        loss_masked = loss / valid_points
+        return loss_masked.mean()
 
 
 class GradLoss(nn.Module):

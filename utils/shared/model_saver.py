@@ -31,6 +31,7 @@ class ModelSaver:
     ):
         if self.best_task_metrics is None:
             self.best_task_metrics = task_metrics
+            self._save_model(model, self.save_dir / "best_model.pth")
 
         cnt = 0
         tasks = task_metrics.keys()
