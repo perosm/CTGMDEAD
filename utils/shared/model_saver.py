@@ -34,31 +34,34 @@ class ModelSaver:
             self.best_task_metrics = task_metrics
             self._save_model(model, self.save_dir / "best_model.pth")
             self._save_best_metrics()
+        else:
+            cnt = 0
+            tasks = task_metrics.keys()
+            for task in tasks:
+                for metric_name in task_metrics[task].keys():
+                    higher_lower_flag = self.task_metrics_higher_lower[task][
+                        metric_name
+                    ]
+                    metric_value = task_metrics[task][metric_name]
+                    if higher_lower_flag is True:
+                        # if higher_lower_flag is True the higher the metric value the better it is
+                        cnt += (
+                            1
+                            if metric_value > self.best_task_metrics[task][metric_name]
+                            else -1
+                        )
+                    elif higher_lower_flag is False:
+                        # if higher_lower_flag is False the lower the metric value the better it is
+                        cnt += (
+                            1
+                            if metric_value < self.best_task_metrics[task][metric_name]
+                            else -1
+                        )
 
-        cnt = 0
-        tasks = task_metrics.keys()
-        for task in tasks:
-            for metric_name in task_metrics[task].keys():
-                higher_lower_flag = self.task_metrics_higher_lower[task][metric_name]
-                metric_value = task_metrics[task][metric_name]
-                if higher_lower_flag is True:
-                    # if higher_lower_flag is True the higher the metric value the better it is
-                    cnt += (
-                        1
-                        if metric_value > self.best_task_metrics[task][metric_name]
-                        else -1
-                    )
-                elif higher_lower_flag is False:
-                    # if higher_lower_flag is False the lower the metric value the better it is
-                    cnt += (
-                        1
-                        if metric_value < self.best_task_metrics[task][metric_name]
-                        else -1
-                    )
-
-        if cnt >= 0:
-            self._save_model(model, self.save_dir / "best_model.pth")
-            self._save_best_metrics()
+            if cnt > 0:
+                self.best_task_metrics = task_metrics
+                self._save_model(model, self.save_dir / "best_model.pth")
+                self._save_best_metrics()
 
     def _save_model(self, model: nn.Module, path: str):
         torch.save(model.state_dict(), path)
