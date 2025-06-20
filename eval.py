@@ -82,7 +82,7 @@ def eval(
 
     metrics_saver.save()
     if model_saver:
-        model_saver(model, metrics_aggregator.task_metrics_per_epochs)
+        model_saver(model, metrics_aggregator.return_aggregated())
     visualizers.plot_visualizations(pred=pred, gt=data, image=data["input"])
 
     return

@@ -67,4 +67,4 @@ class ModelSaver:
     def _save_best_metrics(self) -> None:
         yaml_filepath = self.save_dir / "eval" / "best_metrics.yaml"
         with open(yaml_filepath, "w") as file:
-            yaml.dump(yaml_filepath, file)
+            yaml.dump(self.best_task_metrics, file)
