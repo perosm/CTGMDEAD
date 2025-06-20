@@ -270,6 +270,7 @@ def _load_model_weights(model: MultiTaskNetwork, model_configs: dict):
                 for layer_name in model_dict.keys()
                 if re.match(f"{model_part}.{pretrained_regex}", layer_name)
             ]
+            print(f"Matched layer names: {matched_layer_names}")
             model_dict.update(
                 {
                     matched_layer_name: model_pretrained_dict[matched_layer_name]

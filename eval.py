@@ -101,6 +101,10 @@ def main():
     config_filename = config_file_path.stem
     config_file.update({"name": config_filename})
     model_weights_path = pathlib.Path(save_dir, config_filename, "best_model.pth")
+    config_file["model"].pop("weights_file_path", None)
+    for model_part in config_file["model"].keys():
+        config_file["model"][model_part]["pretrained_regex"] = ["*"]
+
     config_file["model"].update({"weights_file_path": model_weights_path})
     model = configure_model(config_file["model"], device).to(device)
 
