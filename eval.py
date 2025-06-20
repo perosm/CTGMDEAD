@@ -55,7 +55,7 @@ def eval(
     metrics_saver = MetricsSaver(
         metrics_aggregator=metrics_aggregator,
         save_dir=save_dir,
-        name=f"metrics{epoch}" if epoch else "metrics",
+        name=f"metrics_{epoch}" if epoch else "metrics",
     )
     visualizers = configure_visualizers(args, save_dir, epoch)
 
@@ -114,7 +114,7 @@ def main():
     eval(
         args=config_file,
         model=model,
-        epoch=None,
+        epoch="best",
         early_stopping=None,
         loss_aggregator=loss_aggregator,
         model_saver=None,

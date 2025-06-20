@@ -1,3 +1,4 @@
+import yaml
 import pathlib
 import torch
 from torch import nn
@@ -32,6 +33,7 @@ class ModelSaver:
         if self.best_task_metrics is None:
             self.best_task_metrics = task_metrics
             self._save_model(model, self.save_dir / "best_model.pth")
+            self._save_best_metrics()
 
         cnt = 0
         tasks = task_metrics.keys()
@@ -39,14 +41,14 @@ class ModelSaver:
             for metric_name in task_metrics[task].keys():
                 higher_lower_flag = self.task_metrics_higher_lower[task][metric_name]
                 metric_value = task_metrics[task][metric_name]
-                if higher_lower_flag:
+                if higher_lower_flag is True:
                     # if higher_lower_flag is True the higher the metric value the better it is
                     cnt += (
                         1
                         if metric_value > self.best_task_metrics[task][metric_name]
                         else -1
                     )
-                else:
+                elif higher_lower_flag is False:
                     # if higher_lower_flag is False the lower the metric value the better it is
                     cnt += (
                         1
@@ -56,7 +58,13 @@ class ModelSaver:
 
         if cnt >= 0:
             self._save_model(model, self.save_dir / "best_model.pth")
+            self._save_best_metrics()
 
     def _save_model(self, model: nn.Module, path: str):
         torch.save(model.state_dict(), path)
-        print(f"Saved model to {path}.")
+        print(f"Saved model to {path}")
+
+    def _save_best_metrics(self) -> None:
+        yaml_filepath = self.save_dir / "eval" / "best_metrics.yaml"
+        with open(yaml_filepath, "w") as file:
+            yaml.dump(yaml_filepath, file)

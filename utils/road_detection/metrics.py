@@ -44,6 +44,7 @@ class Recall(nn.Module):
         super().__init__()
         self.eval()
         self.threshold = 0.5
+        self.epsilon = 1e-5
 
     def forward(self, pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
         pred = (pred > self.threshold).bool()
@@ -51,7 +52,7 @@ class Recall(nn.Module):
         tp = (pred & gt).sum()
         fn = (~pred & gt).sum()
 
-        return tp / (tp + fn)
+        return tp / (tp + fn + self.epsilon)
 
 
 class FalsePositiveRate(nn.Module):
