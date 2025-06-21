@@ -2,7 +2,6 @@ import torch
 import pathlib
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
-from torch.utils.data import DataLoader
 import dataset.kitti.dataset_utils as KITTIutils
 from utils.shared.enums import TaskEnum
 from collections import defaultdict

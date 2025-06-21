@@ -1,5 +1,4 @@
 import pathlib
-import enum
 
 import numpy as np
 import cv2
