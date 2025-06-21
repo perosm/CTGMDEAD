@@ -2923,3 +2923,131 @@ if __name__ == "__main__":
     nusc = NuScenes(
         version="v1.0-mini", dataroot="./data/nuscenes/nuscenes", verbose=True
     )
+    ########## 1. scene ##########
+    # Scenes loaded
+    print(nusc.list_scenes())
+
+    # Scene metadata
+    my_scene = nusc.scene[0]
+    print(my_scene)
+
+    ########## 2. sample ##########
+    # sample - annotated keyframe of a scene at a given timestamp
+    # keyframe - frame where the time-stamps of data from all the sensors
+    # should be very close to the time-stamp of the sample it points to
+    first_sample_token = my_scene["first_sample_token"]
+    my_sample = nusc.get("sample", first_sample_token)
+    print(my_sample)
+
+    # list_sample() -> lists all related sample_data keyframes and sample_annotation associated with a sample
+    print(nusc.list_sample(my_sample["token"]))
+
+    ########## 3. sample_data ##########
+    # references to a family of data that is collected from these sensors
+    print(my_sample["data"])
+
+    # keys are reffering to the different sensors that form the sensor suite
+    # rendering the sample_data at a particular sensor
+    sensor = "CAM_FRONT"
+    cam_front_data = nusc.get("sample_data", my_sample["data"][sensor])
+    print(cam_front_data)
+
+    nusc.render_sample_data(cam_front_data["token"])
+
+    ########## 4. sample_annotation ##########
+    # sample_annotation - refers to any bounding box defining the position of an object seen in a sample
+    # All location data is given with respect to the global coordinate system
+    my_annotation_token = my_sample["anns"][18]
+    my_annotation_metadata = nusc.get("sample_annotation", my_annotation_token)
+    print(my_annotation_token)
+    nusc.render_annotation(my_annotation_token)
+
+    ########## 5. instance ##########
+    # We generally track an instance across different frames in a particular scene
+    # We do not track them across different scenes
+    my_instance = nusc.instance[599]
+    print(my_instance)
+    instance_token = my_instance["token"]
+    nusc.render_instance(instance_token)
+
+    ########## 6. category ##########
+    # category is the object assignment of an annotation
+    print(nusc.list_categories())
+    print(nusc.category[9])
+
+    ########## 7. attribute ##########
+    # attribute is a property of an instance that may change throughout different parts of a scene
+    # while the category remains the same
+    # e.g. pedestrian standing -> pedestrian walking...
+
+    ########## 8. visibility ##########
+    # visibility is defined as the fraction of pixels of a particular annotation that are visible over the 6 camera feeds, grouped into 4 bins
+    print(nusc.visibility)
+    anntoken = "a7d0722bce164f88adf03ada491ea0ba"
+    visibility_token = nusc.get("sample_annotation", anntoken)["visibility_token"]
+
+    print("Visibility: {}".format(nusc.get("visibility", visibility_token)))
+    nusc.render_annotation(anntoken)
+
+    ########## 9. sensor ##########
+    print(nusc.sensor)
+
+    # every sample_data has a record on which sensor the data is collected
+    print(nusc.sample_data[10])
+
+    ########## 10. calibrated_sensor ##########
+    # consists of the definition of a particular sensor (lidar/radar/camera)
+    # as calibrated on a particular vehicle
+    print(nusc.calibrated_sensor)
+
+    ########## 11. ego_pose ##########
+    # contains information about the location (encoded in translation)
+    # and the orientation (encoded in rotation) of the ego vehicle,
+    # with respect to the global coordinate system
+    print(nusc.ego_pose[0])
+
+    ########## 12. log ##########
+    # contains log information from which the data was extracted
+    print(nusc.log[0])
+
+    ########## 13. map ##########
+    # stored as binary semantic masks from a top-down view
+    print(nusc.map[0])
+
+    ############################## nuScenes Basics ##############################
+    # If you know the token for any record in the DB you can retrieve the record by doing
+    # nusc.get(..., "token")
+    # e.g.
+    # nusc.category[0] == nusc.get("category", nusc.category[0]["token"])
+    # nusc.sample_annotation[0] == nusc.get('visibility', nusc.sample_annotation[0]['visibility_token'])
+
+    # What we will need:
+    import torch
+    import torchvision
+    from utils.object_detection_3d.utils import project_3d_boxes_to_image
+    from utils.shared.enums import ObjectDetectionEnum
+
+    sample_token = nusc.sample[0]["token"]
+    sample = nusc.get("sample", sample_token)
+    sample_annotation_tokens = sample["anns"]
+    cam_front_input_path, cam_front_boxes_list, camera_intrinsic = nusc.get_sample_data(
+        sample["data"]["CAM_FRONT"],
+        selected_anntokens=sample_annotation_tokens,
+    )
+    boxes_gt_info = torch.empty((len(cam_front_boxes_list), len(ObjectDetectionEnum)))
+    cam_front_image = torchvision.io.decode_image(cam_front_input_path).to(
+        torch.float32
+    )
+    for box_index, box_info in enumerate(cam_front_boxes_list):
+        boxes_gt_info[box_index, ObjectDetectionEnum.object_class] = box_info.label
+        boxes_gt_info[box_index, ObjectDetectionEnum.width] = box_info.wlh[0]
+        boxes_gt_info[box_index, ObjectDetectionEnum.length] = box_info.wlh[1]
+        boxes_gt_info[box_index, ObjectDetectionEnum.height] = box_info.wlh[2]
+        boxes_gt_info[box_index, ObjectDetectionEnum.x] = box_info.center[0]
+        boxes_gt_info[box_index, ObjectDetectionEnum.y] = box_info.center[1]
+        boxes_gt_info[box_index, ObjectDetectionEnum.z] = box_info.center[2]
+        boxes_gt_info[box_index, ObjectDetectionEnum.rotation_y] = (
+            box_info.orientation.angle
+        )
+        print(boxes_gt_info)
+    project_3d_boxes_to_image()
