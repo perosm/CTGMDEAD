@@ -19,9 +19,8 @@ from dataset.nuscenes.nuscenes_devkit.nuimages.utils.utils import (
     mask_decode,
     get_font,
     name_to_index_mapping,
-    get_colormap,
 )
-
+from dataset.nuscenes.nuscenes_devkit.nuscenes.utils.color_map import get_colormap
 
 PYTHON_VERSION = sys.version_info[0]
 
