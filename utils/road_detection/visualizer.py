@@ -34,4 +34,4 @@ class Visualizer(VisualizerStrategy):
         image[:, fn] = light_red_overlay
         # image[:, tn] = light_red_overlay
 
-        return {self.task: np.transpose(image, (1, 2, 0)).astype(np.float32)}
+        return {self.task: np.transpose(image, (1, 2, 0)).astype(np.uint8)}

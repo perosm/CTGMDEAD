@@ -34,12 +34,13 @@ class Visualizer:
         gt: dict[str, torch.Tensor],
         image: torch.Tensor,
     ):
+        image = image * 255.0
         data_to_plot = {
             TaskEnum.input: image.squeeze(0)
             .cpu()
             .permute(1, 2, 0)
             .numpy()
-            .astype(np.float32)
+            .astype(np.uint8)
         }
         pred_tasks = set(pred.keys())
         gt_tasks = set(gt.keys())
