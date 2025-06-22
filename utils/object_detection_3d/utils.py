@@ -1,5 +1,6 @@
 import torch
 from torchvision.ops import box_iou
+import numpy as np
 
 
 def get_corners(boxes_3d_info: torch.Tensor) -> torch.Tensor:
@@ -182,6 +183,29 @@ def project_3d_points_to_image(
     return (homogeneous_coordinates_2d / homogeneous_coordinates_2d[:, 2][:, None])[
         :, :2
     ].to(torch.float32)
+
+
+def project_points_to_image_numpy(
+    points_3d: torch.Tensor, projection_matrix: torch.Tensor
+) -> torch.Tensor:
+    """
+    Projects 3d point from world to pixel coordinates.
+
+    Args:
+        point_3d: Points to be projected from camera coordinates to pixel coordinates of shape (num_points, 3).
+        projection_matrix: Camera projection matrix used of shape (3, 4).
+
+    Returns:
+        Point 2D projected to pixel coordinates of shape (num_points, 2).
+    """
+    num_points = points_3d.shape[0]
+    ones = np.ones((num_points, 1))
+    homogeneous_coordinates_3d = np.concatenate([points_3d, ones], axis=1)
+    homogeneous_coordinates_2d = (projection_matrix @ homogeneous_coordinates_3d.T).T
+
+    return (homogeneous_coordinates_2d / homogeneous_coordinates_2d[:, 2][:, None])[
+        :, :2
+    ]
 
 
 def match_proposals_to_objects(

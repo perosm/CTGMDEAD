@@ -68,8 +68,8 @@ class KittiConverter:
         cam_name: str = "CAM_FRONT",
         lidar_name: str = "LIDAR_TOP",
         image_count: int = 10,
-        nusc_version: str = "v1.0-train",
-        split: str = "train",
+        nusc_version: str = "v1.0-mini",
+        split: str = "mini_train",
     ):
         """
         :param nusc_kitti_dir: Where to write the KITTI-style annotations.
