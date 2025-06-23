@@ -967,7 +967,7 @@ if __name__ == "__main__":
     # with_attributes=True -> to print attributes of each object when with_category=True
     nuim.render_image(
         key_camera_token,
-        annotation_type="all",
+        annotation_type="surface",
         with_category=True,
         with_attributes=True,
         box_line_width=-1,

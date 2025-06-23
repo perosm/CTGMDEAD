@@ -546,11 +546,11 @@ class KittiDB:
 
             if with_anns:
                 for box in boxes:
-                    color = np.array(color_func(box.name)) / 255
+                    # color = np.array(color_func(box.name)) / 255
                     box.render(
                         ax,
                         view=view_3d,
-                        colors=(color, color, "k"),
+                        # colors=(color, color, "k"),
                         linewidth=box_linewidth,
                     )
 
@@ -573,29 +573,29 @@ class KittiDB:
                         token, filter_classes=filter_classes
                     )
                     for box, name in zip(boxes_2d, names):
-                        color = np.array(color_func(name)) / 255
+                        # color = np.array(color_func(name)) / 255
                         ax.plot(
                             [box[0], box[0]],
                             [box[1], box[3]],
-                            color=color,
+                            # color=color,
                             linewidth=box_linewidth,
                         )
                         ax.plot(
                             [box[2], box[2]],
                             [box[1], box[3]],
-                            color=color,
+                            # color=color,
                             linewidth=box_linewidth,
                         )
                         ax.plot(
                             [box[0], box[2]],
                             [box[1], box[1]],
-                            color=color,
+                            # color=color,
                             linewidth=box_linewidth,
                         )
                         ax.plot(
                             [box[0], box[2]],
                             [box[3], box[3]],
-                            color=color,
+                            # color=color,
                             linewidth=box_linewidth,
                         )
                 else:

@@ -1,27 +1,17 @@
 import os
+import pathlib
 
 import torch
 import numpy as np
-import pathlib
+import cv2
 from torch.utils.data.dataset import Dataset
-from dataset.nuscenes.nuscenes_devkit.nuscenes.nuscenes import NuScenes
-from dataset.nuscenes.nuscenes_devkit.nuimages.nuimages import NuImages
 import matplotlib.pyplot as plt
 
+from dataset.nuscenes.nuscenes_devkit.nuimages.nuimages import NuImages
 from utils.shared.enums import TaskEnum
 from PIL import Image
-from torchvision import transforms
-from dataset.nuscenes.dataset_utils import (
-    TASK_FOLDER_NAME_MAPPING,
-    TASK_FILE_EXTENSION,
-    OBJDET_LABEL_SHAPE,
-    OBJDET_CLASS_MAPPING,
-    TASK_TRANSFORMS,
-    IMAGE_SIZE,
-)
-from dataset.nuscenes.nuscenes_devkit.nuscenes.utils.data_classes import LidarPointCloud
+from dataset.nuscenes import dataset_utils as NuScenesNuImagesUtils
 from utils.object_detection_3d.utils import project_points_to_image_numpy
-from pyquaternion import Quaternion
 
 
 class NuScenesNuImagesDataset(Dataset):
@@ -32,10 +22,12 @@ class NuScenesNuImagesDataset(Dataset):
             TaskEnum.input,
             TaskEnum.depth,
             TaskEnum.object_detection,
-        ],  # road detection
+            TaskEnum.road_detection,
+        ],
         version: str = "v1.0-mini",
         nuscenes_kitti_dataroot: str = "./data/nuscenes_kitti/mini_train",
         nuimages_dataroot: str = "./data/nuscenes/nuimages",
+        **kwargs,
     ):
         """
         Dataset loader used for NuScenes and NuImages dataset.
@@ -57,14 +49,14 @@ class NuScenesNuImagesDataset(Dataset):
             version=version, dataroot=nuimages_dataroot, verbose=True, lazy=True
         )  # TODO: change verbose=False
 
-        self.nuscenes_sample_list = self._read_nuscenes_sample_list()
+        # self.nuscenes_sample_list = self._read_nuscenes_sample_list()
         self.nuimages_sample_list = self._read_nuimages_sample_list()
-        self.sample_list = self.nuscenes_sample_list + self.nuimages_sample_list
+        self.sample_list = self.nuimages_sample_list
 
     def _fetch_task_dataroot(self) -> dict[str, pathlib.Path]:
         task_dataroot = {}
         for task in self.tasks:
-            folder_name = TASK_FOLDER_NAME_MAPPING.get(task, None)
+            folder_name = NuScenesNuImagesUtils.TASK_FOLDER_NAME_MAPPING.get(task, None)
             if folder_name:
                 task_dataroot[task] = self.nuscenes_kitti_root / folder_name
 
@@ -94,15 +86,24 @@ class NuScenesNuImagesDataset(Dataset):
     def _read_nuimages_sample_list(self) -> list[str]:
         """
         Sample list for NuImages is shared for the tasks of:
-            - object_detection_2d TODO: Should I ignore this?
             - road detection
 
         Returns:
             NuScenes sample list as a list of scene tokens.
         """
         sample_list = []
-        for sample_record in self.nuimages.sample:
-            sample_list.append(sample_record["token"])
+        sample_list_2 = []
+        for surface_ann in self.nuimages.surface_ann:
+            sample_data_token = surface_ann["sample_data_token"]
+            category_token = surface_ann["category_token"]
+            category = self.nuimages.get("category", category_token)
+            category_name = category["name"]
+            if category_name == "flat.driveable_surface":
+                sample_data = self.nuimages.get("sample_data", sample_data_token)
+                sample_list.append(sample_data["sample_token"])
+
+        # for sample_record in self.nuimages.sample:
+        #     sample_list_2.append(sample_record["token"])
 
         return sample_list
 
@@ -110,13 +111,13 @@ class NuScenesNuImagesDataset(Dataset):
     def _read_input(filepath: pathlib.Path) -> torch.Tensor:
         image = Image.open(fp=filepath)
 
-        return TASK_TRANSFORMS["ToTensor"](image)
+        return NuScenesNuImagesUtils.TASK_TRANSFORMS["Crop"](
+            NuScenesNuImagesUtils.TASK_TRANSFORMS["ToTensor"](image)
+        )
 
     @staticmethod
     def _read_depth(filepath: pathlib.Path) -> torch.Tensor:
-        kitti_to_nu_lidar_inv = Quaternion(axis=(0, 0, 1), angle=np.pi / 2).inverse
-        pcl = LidarPointCloud.from_file(file_name=str(filepath))
-        # pcl.rotate(kitti_to_nu_lidar_inv)  # Rotate to KITTI lidar.
+        pcl = np.fromfile(filepath, dtype=np.float32).reshape(-1, 4)
 
         # Transform pointcloud to camera frame.
         transformation_matrices_filepath = pathlib.Path(
@@ -128,7 +129,11 @@ class NuScenesNuImagesDataset(Dataset):
                 filepath=transformation_matrices_filepath, matrix_name="Tr_velo_to_cam"
             ).reshape(3, 4)
         )
-        pcl.transform(transf_matrix=transformation_matrix)
+        num_points = pcl.shape[0]
+        pcl[:, :3] = (
+            transformation_matrix
+            @ np.concatenate([pcl[:, :3], np.ones([num_points, 1])], axis=1).T
+        ).T[:, :3]
 
         # Project points to image
         rectification_projection_matrix = np.eye(4)
@@ -143,20 +148,23 @@ class NuScenesNuImagesDataset(Dataset):
         rectification_projection_matrix = (
             projection_matrix @ rectification_projection_matrix
         )
-        points = pcl.points.T  # (num_points, 4)
-        points = points[np.where(points[:, 2] >= 0)[0]]  # Points with positive depth
-        depth = points[:, 2]
+        pcl = pcl[np.where(pcl[:, 2] >= 0)[0]]  # Points with positive depth
+        depth = pcl[:, 2]
         points_2d = project_points_to_image_numpy(
-            points_3d=points[:, :3], projection_matrix=rectification_projection_matrix
+            points_3d=pcl[:, :3], projection_matrix=rectification_projection_matrix
         )
-        image = np.zeros((*IMAGE_SIZE, 1))
+        image = np.zeros((*NuScenesNuImagesUtils.IMAGE_SIZE, 1))
         # Points with x in range [0, IMAGE_WIDTH)
         keep = np.where(points_2d[:, 0] >= 0, True, False)
-        keep = keep & np.where(points_2d[:, 0] < IMAGE_SIZE[1], True, False)
+        keep = keep & np.where(
+            points_2d[:, 0] < NuScenesNuImagesUtils.IMAGE_SIZE[1], True, False
+        )
 
         # Points with y in range [0, IMAGE_HEIGHT)
         keep = keep & np.where(points_2d[:, 1] >= 0, True, False)
-        keep = keep & np.where(points_2d[:, 1] < IMAGE_SIZE[0], True, False)
+        keep = keep & np.where(
+            points_2d[:, 1] < NuScenesNuImagesUtils.IMAGE_SIZE[0], True, False
+        )
         points_2d = points_2d[keep]
         depth = depth[keep]
 
@@ -174,7 +182,9 @@ class NuScenesNuImagesDataset(Dataset):
         # cbar = plt.colorbar(scatter_plot)
         # cbar.set_label("depth")
         # plt.show()
-        return torch.from_numpy(image)  # TODO: check again if this is ok
+        return NuScenesNuImagesUtils.TASK_TRANSFORMS["Crop"](
+            torch.from_numpy(image).permute(2, 0, 1)
+        ).to(torch.float32)
 
     @staticmethod
     def _read_transformation_matrix(
@@ -196,20 +206,27 @@ class NuScenesNuImagesDataset(Dataset):
     @staticmethod
     def _read_object_detection(filepath: pathlib.Path) -> torch.Tensor:
         if not filepath.exists():
-            return torch.fill_(torch.empty((1, OBJDET_LABEL_SHAPE)), torch.nan)
+            return torch.fill_(
+                torch.empty((1, NuScenesNuImagesUtils.OBJDET_LABEL_SHAPE)), torch.nan
+            )
 
         with open(filepath, "r") as file:
             lines = [line.strip().split(" ") for line in file.readlines()]
 
         objects_to_keep = []
         NUM_DETECTIONS = len(lines)
-        gt = np.empty(shape=(NUM_DETECTIONS, OBJDET_LABEL_SHAPE), dtype=np.float32)
+        gt = np.empty(
+            shape=(NUM_DETECTIONS, NuScenesNuImagesUtils.OBJDET_LABEL_SHAPE),
+            dtype=np.float32,
+        )
         for object_index, object_info in enumerate(lines):
-            class_num = OBJDET_CLASS_MAPPING[object_info[0]]
+            class_num = NuScenesNuImagesUtils.OBJDET_CLASS_MAPPING[object_info[0]]
             if class_num == -1:
                 continue
 
-            gt[object_index, 0] = OBJDET_CLASS_MAPPING[object_info[0]]  # type
+            gt[object_index, 0] = NuScenesNuImagesUtils.OBJDET_CLASS_MAPPING[
+                object_info[0]
+            ]  # type
             gt[object_index, 1] = float(object_info[1])  # truncated flag
             gt[object_index, 2] = float(object_info[2])  # occluded flag
             gt[object_index, 3] = float(object_info[3])  # alpha
@@ -217,6 +234,18 @@ class NuScenesNuImagesDataset(Dataset):
                 float(image_coord)
                 for image_coord in object_info[4:8]  # left, top, right, bottom
             ]
+            gt[object_index, 4] -= (
+                NuScenesNuImagesUtils.NUSCENES_H - NuScenesNuImagesUtils.NEW_W
+            ) / 2  # left
+            gt[object_index, 5] -= (
+                NuScenesNuImagesUtils.NUSCENES_H - NuScenesNuImagesUtils.NEW_H
+            )  # top
+            gt[object_index, 6] -= (
+                NuScenesNuImagesUtils.NUSCENES_W - NuScenesNuImagesUtils.NEW_W
+            ) / 2  # right
+            gt[object_index, 7] -= (
+                NuScenesNuImagesUtils.NUSCENES_W - NuScenesNuImagesUtils.NEW_H
+            )  # bottom
             gt[object_index, 8:15] = [
                 float(world_coord) for world_coord in object_info[8:15]
             ]
@@ -224,12 +253,8 @@ class NuScenesNuImagesDataset(Dataset):
 
         return torch.from_numpy(gt[objects_to_keep])
 
-    @staticmethod
-    def _read_road_detection(filepath: pathlib.Path) -> torch.Tensor:
-        pass
-
     def __len__(self):
-        return len(self.sample_list)
+        return 1  # len(self.sample_list)
 
     def __getitem__(self, index):
         data = {}
@@ -237,23 +262,75 @@ class NuScenesNuImagesDataset(Dataset):
         for task in self.tasks:
             filepath = (
                 self.nuimages_task_dataroot[task]
-                / f"{sample_token}.{TASK_FILE_EXTENSION[task]}"
+                / f"{sample_token}.{NuScenesNuImagesUtils.TASK_FILE_EXTENSION[task]}"
             )
-            if task == TaskEnum.input:
-                data[task] = NuScenesNuImagesDataset._read_input(filepath=filepath)
-            elif task == TaskEnum.depth:
-                data[task] = NuScenesNuImagesDataset._read_depth(filepath=filepath)
-            elif task == TaskEnum.object_detection:
-                data[task] = NuScenesNuImagesDataset._read_object_detection(
-                    filepath=filepath
+            if filepath.exists():
+                #################### NuScenes dataset ####################
+                if task == TaskEnum.input:
+                    data[task] = NuScenesNuImagesDataset._read_input(filepath=filepath)
+                    data["projection_matrix"] = torch.from_numpy(
+                        NuScenesNuImagesDataset._read_transformation_matrix(
+                            filepath=str(filepath)
+                            .replace("image_2", "calib")
+                            .replace(".png", ".txt"),
+                            matrix_name="P2",
+                        ).reshape(3, 4)
+                    )
+                elif task == TaskEnum.depth:
+                    data[task] = NuScenesNuImagesDataset._read_depth(filepath=filepath)
+                elif task == TaskEnum.object_detection:
+                    object_detection_gt = (
+                        NuScenesNuImagesDataset._read_object_detection(
+                            filepath=filepath
+                        )
+                    )
+                    projection_matrix = torch.from_numpy(
+                        NuScenesNuImagesDataset._read_transformation_matrix(
+                            filepath=str(filepath).replace("label_2", "calib"),
+                            matrix_name="P2",
+                        ).reshape(3, 4)
+                    )
+                    projection_matrix[
+                        0, 2
+                    ] -= NuScenesNuImagesUtils.DELTA_PRINCIPAL_POINT_X
+                    projection_matrix[
+                        1, 2
+                    ] -= NuScenesNuImagesUtils.DELTA_PRINCIPAL_POINT_Y
+                    data[task] = {
+                        "gt_info": object_detection_gt,
+                        "projection_matrix": projection_matrix,
+                    }
+            elif not filepath.exists() and sample_token in self.nuimages_sample_list:
+                #################### NuImages dataset ####################
+                sample = self.nuimages.get("sample", sample_token)
+                key_camera_token = sample["key_camera_token"]
+                sample_data = self.nuimages.get("sample_data", key_camera_token)
+                calibrated_sensor_data = self.nuimages.get(
+                    "calibrated_sensor", sample_data["calibrated_sensor_token"]
                 )
-            elif task == TaskEnum.road_detection:
-                data[task] = ...
-
+                if task == TaskEnum.input:
+                    filepath = os.path.join(
+                        self.nuimages.dataroot, sample_data["filename"]
+                    )
+                    data[task] = NuScenesNuImagesDataset._read_input(filepath)
+                if task == TaskEnum.road_detection:
+                    semantic_mask, _ = self.nuimages.get_segmentation(key_camera_token)
+                    road_mask = np.where(
+                        semantic_mask
+                        == NuScenesNuImagesUtils.FLAT_DRIVEABLE_SURFACE_INDEX,
+                        1,
+                        0,
+                    )
+                    data[task] = NuScenesNuImagesUtils.TASK_TRANSFORMS["Crop"](
+                        torch.from_numpy(road_mask).to(torch.float32)
+                    ).unsqueeze(0)
         return data
 
 
 if __name__ == "__main__":
+    from tqdm import tqdm
+
     dataset = NuScenesNuImagesDataset()
 
-    sample = next(iter(dataset))
+    for sample_idx, data in enumerate(tqdm(dataset, "Loading samples...")):
+        print("Sample idx: ", sample_idx)

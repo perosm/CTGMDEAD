@@ -17,6 +17,7 @@ from utils.shared.aggregators.Aggregator import Aggregator
 from utils.shared.metrics import MultiTaskMetrics
 
 from dataset.kitti.KittiDataset import KittiDataset
+from dataset.nuscenes.NuScenesDataset import NuScenesNuImagesDataset
 from model.resnet import ResNet18, ResNet
 from model.input_reconstruction.input_reconstruction_decoder import (
     UnetInputReconstructionDecoder,
@@ -136,14 +137,14 @@ def prepare_save_directories(args: dict, subfolder_name="train") -> None:
 
 def configure_dataset(dataset_configs: dict[str, str | list], mode: str) -> Dataset:
     dataset_dict = {
-        KittiDataset.__name__: KittiDataset(
-            dataset_configs["task_paths"],
-            dataset_configs["task_transform"],
-            task_sample_list_path=dataset_configs[f"task_sample_list_path_{mode}"],
-            co_train=dataset_configs["co_train"],
-        )
+        KittiDataset.__name__: KittiDataset,
+        NuScenesNuImagesDataset.__name__: NuScenesNuImagesDataset,
     }
-    return dataset_dict[dataset_configs["dataset_name"]]
+    if dataset_configs["dataset_name"] == KittiDataset.__name__:
+        dataset_configs["task_sample_list_path"] = dataset_configs.pop(
+            f"task_sample_list_path_{mode}"
+        )
+    return dataset_dict[dataset_configs["dataset_name"]](**dataset_configs)
 
 
 def configure_dataloader(
@@ -484,7 +485,11 @@ def configure_metrics(metric_configs):
 def configure_visualizers(
     configs: dict, save_dir: pathlib.Path, epoch: int
 ) -> Visualizer:
-    visualizer_configs = configs["dataset"]["task_paths"]
+    visualizer_configs = (
+        configs["dataset"]["task_paths"]
+        if configs["dataset"].get("task_paths", None)
+        else configs["dataset"]["tasks"]
+    )
     save_path = save_dir / "images"
 
     visualizers_dict = {
@@ -497,7 +502,7 @@ def configure_visualizers(
     return Visualizer(
         {
             task: visualizers_dict[task]()
-            for task in visualizer_configs.keys()
+            for task in visualizer_configs
             if task in visualizers_dict
         },
         save_dir=save_path,

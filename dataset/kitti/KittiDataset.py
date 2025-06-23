@@ -21,6 +21,7 @@ class KittiDataset(Dataset):
         task_sample_list_path: dict[str, str] = None,
         camera: str = "image_02",
         co_train: bool = False,
+        **kwargs,  # never used, just here enable to dynamically instantiate dataset through config
     ) -> None:
         """
         Args:
