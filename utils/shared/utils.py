@@ -200,7 +200,7 @@ def configure_model(model_configs: dict, device: torch.device) -> nn.Module:
         road_detection_decoder = road_detection_decoder.to(device)
 
     necks_and_heads = _configure_necks_and_heads(
-        model_configs.get("necks_and_heads", None), device
+        model_configs.get("heads_and_necks", None), device
     )
     model = MultiTaskNetwork(
         encoder=encoder,
@@ -267,11 +267,11 @@ def _load_model_weights(model: MultiTaskNetwork, model_configs: dict):
             continue
         for pretrained_regex in pretrained_regex_list:
             matched_layer_names = [
-                re.match(f"{model_part}.{pretrained_regex}", layer_name).string
+                re.search(f"{model_part}.{pretrained_regex}", layer_name).string
                 for layer_name in model_dict.keys()
-                if re.match(f"{model_part}.{pretrained_regex}", layer_name)
+                if re.search(f"{model_part}.{pretrained_regex}", layer_name)
             ]
-            print(f"Matched layer names: {matched_layer_names}")
+            print(f"Matched layer names for {model_part}: {matched_layer_names}")
             model_dict.update(
                 {
                     matched_layer_name: model_pretrained_dict[matched_layer_name]
@@ -323,7 +323,7 @@ def freeze_model(model: MultiTaskNetwork, model_configs: dict, epoch: int = 0) -
             if submodule_config.get("unfreeze_epoch") == epoch:
                 freeze_params(submodule, freeze=False)
 
-    heads_and_necks_config = model_configs.get("necks_and_heads", {})
+    heads_and_necks_config = model_configs.get("heads_and_necks", {})
     heads_and_necks = getattr(model, "heads_and_necks", None)
 
     if heads_and_necks and heads_and_necks_config:

@@ -63,7 +63,7 @@ model:
     out_channels: 1
     freeze_epoch: -1
     unfreeze_epoch: 0
-  necks_and_heads:
+  heads_and_necks:
     name: FPNFasterRCNN
     image_size: [256, 1184]
     pool_output_size: [7, 7] # shared between RoI and output heads
