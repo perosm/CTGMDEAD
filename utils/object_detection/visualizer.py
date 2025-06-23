@@ -87,10 +87,10 @@ class Visualizer(VisualizerStrategy):
 
     def _visualize_3d(
         self,
-        pred: np.ndarray,
-        gt: np.ndarray,
-        image: np.ndarray,
-        projection_matrix: np.ndarray,
+        pred: torch.Tensor,
+        gt: torch.Tensor,
+        image: torch.Tensor,
+        projection_matrix: torch.Tensor,
     ) -> dict[str, np.ndarray]:
         # Solves error: Layout of the output array img is incompatible with cv::Mat
         # https://stackoverflow.com/questions/26998223/what-is-the-difference-between-contiguous-and-non-contiguous-arrays

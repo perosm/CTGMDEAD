@@ -11,7 +11,7 @@ from dataset.nuscenes.nuscenes_devkit.nuimages.nuimages import NuImages
 from utils.shared.enums import TaskEnum
 from PIL import Image
 from dataset.nuscenes import dataset_utils as NuScenesNuImagesUtils
-from utils.object_detection_3d.utils import project_points_to_image_numpy
+from utils.object_detection_3d import utils as ObjectDetection3DUtils
 
 
 class NuScenesNuImagesDataset(Dataset):
@@ -46,12 +46,12 @@ class NuScenesNuImagesDataset(Dataset):
         self.nuimages_task_dataroot = self._fetch_task_dataroot()
         self.nuimages_dataroot = pathlib.Path(nuimages_dataroot)
         self.nuimages = NuImages(
-            version=version, dataroot=nuimages_dataroot, verbose=True, lazy=True
+            version=version, dataroot=nuimages_dataroot, verbose=False, lazy=True
         )  # TODO: change verbose=False
 
-        # self.nuscenes_sample_list = self._read_nuscenes_sample_list()
+        self.nuscenes_sample_list = self._read_nuscenes_sample_list()
         self.nuimages_sample_list = self._read_nuimages_sample_list()
-        self.sample_list = self.nuimages_sample_list
+        self.sample_list = self.nuscenes_sample_list + self.nuimages_sample_list
 
     def _fetch_task_dataroot(self) -> dict[str, pathlib.Path]:
         task_dataroot = {}
@@ -110,7 +110,8 @@ class NuScenesNuImagesDataset(Dataset):
     @staticmethod
     def _read_input(filepath: pathlib.Path) -> torch.Tensor:
         image = Image.open(fp=filepath)
-
+        # plt.imshow(image)
+        # plt.title("input_image")
         return NuScenesNuImagesUtils.TASK_TRANSFORMS["Crop"](
             NuScenesNuImagesUtils.TASK_TRANSFORMS["ToTensor"](image)
         )
@@ -150,7 +151,7 @@ class NuScenesNuImagesDataset(Dataset):
         )
         pcl = pcl[np.where(pcl[:, 2] >= 0)[0]]  # Points with positive depth
         depth = pcl[:, 2]
-        points_2d = project_points_to_image_numpy(
+        points_2d = ObjectDetection3DUtils.project_points_to_image_numpy(
             points_3d=pcl[:, :3], projection_matrix=rectification_projection_matrix
         )
         image = np.zeros((*NuScenesNuImagesUtils.IMAGE_SIZE, 1))
@@ -253,10 +254,10 @@ class NuScenesNuImagesDataset(Dataset):
 
         return torch.from_numpy(gt[objects_to_keep])
 
-    def __len__(self):
-        return 1  # len(self.sample_list)
+    def __len__(self) -> int:
+        return len(self.sample_list)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
         data = {}
         sample_token = self.sample_list[index]
         for task in self.tasks:
@@ -264,7 +265,7 @@ class NuScenesNuImagesDataset(Dataset):
                 self.nuimages_task_dataroot[task]
                 / f"{sample_token}.{NuScenesNuImagesUtils.TASK_FILE_EXTENSION[task]}"
             )
-            if filepath.exists():
+            if filepath.exists():  # depth, object_detection
                 #################### NuScenes dataset ####################
                 if task == TaskEnum.input:
                     data[task] = NuScenesNuImagesDataset._read_input(filepath=filepath)
@@ -300,7 +301,9 @@ class NuScenesNuImagesDataset(Dataset):
                         "gt_info": object_detection_gt,
                         "projection_matrix": projection_matrix,
                     }
-            elif not filepath.exists() and sample_token in self.nuimages_sample_list:
+            elif (
+                not filepath.exists() and sample_token in self.nuimages_sample_list
+            ):  # road_detection
                 #################### NuImages dataset ####################
                 sample = self.nuimages.get("sample", sample_token)
                 key_camera_token = sample["key_camera_token"]
@@ -313,6 +316,11 @@ class NuScenesNuImagesDataset(Dataset):
                         self.nuimages.dataroot, sample_data["filename"]
                     )
                     data[task] = NuScenesNuImagesDataset._read_input(filepath)
+                    projection_matrix = np.eye(4)
+                    projection_matrix[:3, :3] = np.array(
+                        calibrated_sensor_data["camera_intrinsic"]
+                    ).reshape(3, 3)
+                    data["projection_matrix"] = torch.from_numpy(projection_matrix)
                 if task == TaskEnum.road_detection:
                     semantic_mask, _ = self.nuimages.get_segmentation(key_camera_token)
                     road_mask = np.where(
@@ -321,6 +329,9 @@ class NuScenesNuImagesDataset(Dataset):
                         1,
                         0,
                     )
+                    # plt.imshow(road_mask)
+                    # plt.title("road_detection")
+                    # plt.show()
                     data[task] = NuScenesNuImagesUtils.TASK_TRANSFORMS["Crop"](
                         torch.from_numpy(road_mask).to(torch.float32)
                     ).unsqueeze(0)
