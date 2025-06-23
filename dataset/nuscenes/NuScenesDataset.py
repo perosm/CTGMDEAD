@@ -8,7 +8,7 @@ from torch.utils.data.dataset import Dataset
 import matplotlib.pyplot as plt
 
 from dataset.nuscenes.nuscenes_devkit.nuimages.nuimages import NuImages
-from utils.shared.enums import TaskEnum
+from utils.shared.enums import TaskEnum, ObjectDetectionEnum
 from PIL import Image
 from dataset.nuscenes import dataset_utils as NuScenesNuImagesUtils
 from utils.object_detection_3d import utils as ObjectDetection3DUtils
@@ -225,34 +225,72 @@ class NuScenesNuImagesDataset(Dataset):
             if class_num == -1:
                 continue
 
-            gt[object_index, 0] = NuScenesNuImagesUtils.OBJDET_CLASS_MAPPING[
-                object_info[0]
-            ]  # type
-            gt[object_index, 1] = float(object_info[1])  # truncated flag
-            gt[object_index, 2] = float(object_info[2])  # occluded flag
-            gt[object_index, 3] = float(object_info[3])  # alpha
-            gt[object_index, 4:8] = [
+            gt[object_index, ObjectDetectionEnum.object_class] = (
+                NuScenesNuImagesUtils.OBJDET_CLASS_MAPPING[object_info[0]]
+            )  # type
+            gt[object_index, ObjectDetectionEnum.truncated] = float(
+                object_info[1]
+            )  # truncated flag
+            gt[object_index, ObjectDetectionEnum.occluded] = float(
+                object_info[2]
+            )  # occluded flag
+            gt[object_index, ObjectDetectionEnum.alpha] = float(object_info[3])  # alpha
+            gt[
+                object_index,
+                ObjectDetectionEnum.box_2d_left : ObjectDetectionEnum.box_2d_bottom + 1,
+            ] = [
                 float(image_coord)
                 for image_coord in object_info[4:8]  # left, top, right, bottom
             ]
-            gt[object_index, 4] -= (
-                NuScenesNuImagesUtils.NUSCENES_H - NuScenesNuImagesUtils.NEW_W
+            gt[object_index, ObjectDetectionEnum.box_2d_left] -= (
+                NuScenesNuImagesUtils.NUSCENES_W - NuScenesNuImagesUtils.NEW_W
             ) / 2  # left
-            gt[object_index, 5] -= (
+            gt[object_index, ObjectDetectionEnum.box_2d_top] -= (
                 NuScenesNuImagesUtils.NUSCENES_H - NuScenesNuImagesUtils.NEW_H
             )  # top
-            gt[object_index, 6] -= (
+            gt[object_index, ObjectDetectionEnum.box_2d_right] -= (
                 NuScenesNuImagesUtils.NUSCENES_W - NuScenesNuImagesUtils.NEW_W
             ) / 2  # right
-            gt[object_index, 7] -= (
-                NuScenesNuImagesUtils.NUSCENES_W - NuScenesNuImagesUtils.NEW_H
+            gt[object_index, ObjectDetectionEnum.box_2d_bottom] -= (
+                NuScenesNuImagesUtils.NUSCENES_H - NuScenesNuImagesUtils.NEW_H
             )  # bottom
-            gt[object_index, 8:15] = [
-                float(world_coord) for world_coord in object_info[8:15]
-            ]
-            objects_to_keep.append(object_index)
+            gt[
+                object_index,
+                ObjectDetectionEnum.height : ObjectDetectionEnum.rotation_y + 1,
+            ] = [float(world_coord) for world_coord in object_info[8:15]]
+            if NuScenesNuImagesDataset._is_in_bounds(gt[object_index]):
+                objects_to_keep.append(object_index)
 
         return torch.from_numpy(gt[objects_to_keep])
+
+    @staticmethod
+    def _is_in_bounds(object_detection_gt: np.ndarray) -> bool:
+        if (
+            object_detection_gt[ObjectDetectionEnum.box_2d_left] < 0
+            or object_detection_gt[ObjectDetectionEnum.box_2d_left]
+            >= NuScenesNuImagesUtils.NEW_W
+        ):
+            return False
+        if (
+            object_detection_gt[ObjectDetectionEnum.box_2d_top] < 0
+            or object_detection_gt[ObjectDetectionEnum.box_2d_top]
+            >= NuScenesNuImagesUtils.NEW_H
+        ):
+            return False
+        if (
+            object_detection_gt[ObjectDetectionEnum.box_2d_right] < 0
+            or object_detection_gt[ObjectDetectionEnum.box_2d_right]
+            >= NuScenesNuImagesUtils.NEW_W
+        ):
+            return False
+        if (
+            object_detection_gt[ObjectDetectionEnum.box_2d_bottom] < 0
+            or object_detection_gt[ObjectDetectionEnum.box_2d_bottom]
+            >= NuScenesNuImagesUtils.NEW_H
+        ):
+            return False
+
+        return True
 
     def __len__(self) -> int:
         return len(self.sample_list)
