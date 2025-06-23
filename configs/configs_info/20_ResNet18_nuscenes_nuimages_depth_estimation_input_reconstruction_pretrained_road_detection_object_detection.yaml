@@ -19,7 +19,7 @@ early_stopping:
 epochs: 100
 
 model:
-  weights_file_path: # ../run_info/01_ResNet18_kitti_depth_input_reconstruction_pretrained_road_detection_object_detection/best_model.pth
+  weights_file_path: ../run_info/01_ResNet18_kitti_depth_input_reconstruction_pretrained_road_detection_object_detection/best_model.pth
   encoder:
     name: ResNet18
     freeze_epoch: 0
@@ -33,6 +33,7 @@ model:
     main_decoder: True
     freeze_epoch: -1
     unfreeze_epoch: 0
+    pretrained_regex: ["*"]
   depth_decoder:
     name: UnetDepthDecoder
     in_channels: 512
@@ -49,9 +50,10 @@ model:
     out_channels: 1
     freeze_epoch: -1
     unfreeze_epoch: 0
-  necks_and_heads:
+    pretrained_regex: ["*"]
+  heads_and_necks:
     name: FPNFasterRCNN
-    image_size: [256, 1184]
+    image_size: [896, 1600]
     pool_output_size: [7, 7] # shared between RoI and output heads
     feature_map_names: ["fpn0", "fpn1", "fpn2", "fpn3"]
     num_channels_per_feature_map: [64, 64, 128, 256]
@@ -59,12 +61,13 @@ model:
     probability_threshold: 0.1
     iou_threshold: 0.5
     num_classes: 4 # number of classes we are trying to predict + background
+    pretrained_regex: ["*"]
     rpn:
       - objectness_threshold: 0.5
       - iou_threshold: 0.7
-      - pre_nms_filtering: 6000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
-      - top_k_proposals_training: 256 # per fpn layer
-      - top_k_proposals_testing: 8 # per fpn layer
+      - pre_nms_filtering: 8000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
+      - top_k_proposals_training: 512 # per fpn layer
+      - top_k_proposals_testing: 16 # per fpn layer
       - anchor_generator:
         - sizes: [[64], [128], [256], [512]]
         - aspect_ratios: [0.5, 1, 2]
@@ -98,16 +101,23 @@ model:
       - unfreeze_epoch: 0
 
 prediction_postprocess: # used only in eval
+  - input: # None
   - depth:
     - min_depth: 0.0
-    - max_depth: 90.0
+    - max_depth: 255.0
   - road_detection: # None
   - object_detection: # None
 
 loss:
+  # input:
+  #   - MSE:
+  #     - scale_factor: 1
+  # depth: 
+  #   - MaskedMAE:
+  #     - scale_factor: 1
   road_detection:
     - BinaryCrossEntropyLoss:
-      - scale_factor: 1.0
+      - scale_factor: 1
   object_detection: 
     - RPNClassificationAndRegressionLoss:
       - scale_factor: 1
@@ -136,6 +146,14 @@ eval:
     num_workers: 1
 
 metrics:
+  input:
+    - MSE
+    # - SSIM # TODO: implement SSIM
+  depth:
+    - MaskedMAE
+    - MaskedAverageRelativeError
+    - MaskedRMSE
+    - MaskedThresholdAccracy  
   road_detection:
     - IoU
     - Precision
