@@ -40,6 +40,7 @@ import os
 from typing import List, Dict, Any
 
 import fire
+import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -67,9 +68,9 @@ class KittiConverter:
         nusc_kitti_dir: str = "./data/nusc_kitti",
         cam_name: str = "CAM_FRONT",
         lidar_name: str = "LIDAR_TOP",
-        image_count: int = 10,
+        image_count: int = -1,
         nusc_version: str = "v1.0-trainval",
-        split: str = "mini_train",
+        split: str = "train",  # "val"
     ):
         """
         :param nusc_kitti_dir: Where to write the KITTI-style annotations.
@@ -122,7 +123,7 @@ class KittiConverter:
         sample_tokens = sample_tokens[: self.image_count]
 
         tokens = []
-        for sample_token in sample_tokens:
+        for sample_token in tqdm.tqdm(sample_tokens, "Converting data..."):
 
             # Get sample data.
             sample = self.nusc.get("sample", sample_token)
