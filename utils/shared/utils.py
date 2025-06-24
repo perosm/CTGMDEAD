@@ -141,7 +141,7 @@ def configure_dataset(dataset_configs: dict[str, str | list], mode: str) -> Data
         NuScenesNuImagesDataset.__name__: NuScenesNuImagesDataset,
     }
     if dataset_configs["dataset_name"] == KittiDataset.__name__:
-        dataset_configs["task_sample_list_path"] = dataset_configs.pop(
+        dataset_configs["task_sample_list_path"] = dataset_configs.get(
             f"task_sample_list_path_{mode}"
         )
     return dataset_dict[dataset_configs["dataset_name"]](**dataset_configs)
