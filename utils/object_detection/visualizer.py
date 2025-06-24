@@ -136,7 +136,7 @@ class Visualizer(VisualizerStrategy):
         self, pred: torch.Tensor, gt: torch.Tensor, image_shape: tuple[int, int]
     ) -> np.ndarray:
         C, H, W = image_shape
-        image = np.zeros((W, W, C))  # (80, 90))
+        image = np.zeros((H, W, C))  # (80, 90))
         pred_boxes_bev = project_3d_boxes_to_bev(boxes_3d_info=pred).numpy()
         gt_boxes_bev = project_3d_boxes_to_bev(boxes_3d_info=gt).numpy()
 

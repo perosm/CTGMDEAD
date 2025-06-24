@@ -68,7 +68,7 @@ class KittiConverter:
         cam_name: str = "CAM_FRONT",
         lidar_name: str = "LIDAR_TOP",
         image_count: int = 10,
-        nusc_version: str = "v1.0-mini",
+        nusc_version: str = "v1.0-trainval",
         split: str = "mini_train",
     ):
         """
