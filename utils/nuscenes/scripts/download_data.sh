@@ -31,13 +31,13 @@ wget -P $nuscenes_folder https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-
 tar -xvzf $nuscenes_folder/v1.0-trainval01_keyframes.tgz -C $nuscenes_folder
 rm $nuscenes_folder/v1.0-trainval01_keyframes.tgz
 
-wget -P $nuscenes_folder https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-trainval05_keyframes.tgz
-tar -xvzf $nuscenes_folder/v1.0-trainval05_keyframes.tgz -C $nuscenes_folder
-rm $nuscenes_folder/v1.0-trainval05_keyframes.tgz
+wget -P $nuscenes_folder https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-trainval02_keyframes.tgz
+tar -xvzf $nuscenes_folder/v1.0-trainval02_keyframes.tgz -C $nuscenes_folder
+rm $nuscenes_folder/v1.0-trainval02_keyframes.tgz
 
-wget -P $nuscenes_folder https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-trainval10_keyframes.tgz
-tar -xvzf $nuscenes_folder/v1.0-trainval10_keyframes.tgz -C $nuscenes_folder
-rm $nuscenes_folder/v1.0-trainval10_keyframes.tgz
+wget -P $nuscenes_folder https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-trainval03_keyframes.tgz
+tar -xvzf $nuscenes_folder/v1.0-trainval03_keyframes.tgz -C $nuscenes_folder
+rm $nuscenes_folder/v1.0-trainval03_keyframes.tgz
 
 ##### nuscenes mini #####
 # wget -P $nuscenes_folder https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-mini.tgz
