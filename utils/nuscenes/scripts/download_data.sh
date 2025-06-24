@@ -40,6 +40,6 @@ tar -xvzf $nuscenes_folder/v1.0-trainval03_keyframes.tgz -C $nuscenes_folder
 rm $nuscenes_folder/v1.0-trainval03_keyframes.tgz
 
 ##### nuscenes mini #####
-# wget -P $nuscenes_folder https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-mini.tgz
-# tar -xvzf $nuscenes_folder/v1.0-mini.tgz -C $nuscenes_folder
-# rm $nuscenes_folder/v1.0-mini.tgz
+wget -P $nuscenes_folder https://d36yt3mvayqw5m.cloudfront.net/public/v1.0/v1.0-mini.tgz
+tar -xvzf $nuscenes_folder/v1.0-mini.tgz -C $nuscenes_folder
+rm $nuscenes_folder/v1.0-mini.tgz

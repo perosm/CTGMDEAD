@@ -1,0 +1,91 @@
+# Rebalanced 03_ResNet18_kitti_depth_estimation_input_reconstruction_depth_decoder_main
+device: cuda
+dataset:
+  co_train: False # set to False since input has all images so there's not a problem with non existent groundtruths for some samples
+  dataset_name: KittiDataset
+  task_transform:
+    input: 
+      - Crop
+      - Divide
+    depth:
+      - Crop
+  task_paths:
+    input: "./data/kitti/input" # "../../datasets/kitti_data/"
+    depth: "./data/kitti/depth"
+  task_sample_list_path_train:
+    depth: "./data/kitti/sample_lists/train/depth_sample_list.txt"
+  task_sample_list_path_val:
+    depth: "./data/kitti/sample_lists/val/depth_sample_list.txt"
+
+train:
+  dataloader:
+    batch_size: 32
+    shuffle: True
+    num_workers: 1
+
+early_stopping:
+  patience: 5
+  min_delta: 0.01
+
+epochs: 100
+
+model:
+  weights_file_path:
+  encoder:
+    name: ResNet18
+    pretrained: True
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+  depth_decoder:
+    name: UnetDepthDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    main_decoder: True
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+  input_reconstruction_decoder:
+    name: UnetInputReconstructionDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 3
+    main_decoder: False
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+
+prediction_postprocess: # used only in eval
+  - input:
+  - depth:
+    - min_depth: 0.0
+    - max_depth: 90.0
+
+loss:
+  input:
+    - MSE:
+      - scale_factor: 500.0
+  depth: 
+    - MaskedMAE:
+      - scale_factor: 1.0
+
+optimizer:
+  name: Adam
+  lr: 1e-4
+
+eval:
+  dataloader:
+    batch_size: 1
+    shuffle: True
+    num_workers: 1
+
+
+metrics:
+  input:
+    - MSE
+    # - SSIM # TODO: implement SSIM
+  depth:
+    - MaskedMAE
+    - MaskedAverageRelativeError
+    - MaskedRMSE
+    - MaskedThresholdAccracy  
+
+save_path: ../run_info/
