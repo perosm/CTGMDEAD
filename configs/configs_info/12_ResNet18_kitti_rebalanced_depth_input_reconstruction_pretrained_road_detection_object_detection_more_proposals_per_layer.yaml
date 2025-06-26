@@ -34,7 +34,7 @@ early_stopping:
 epochs: 100
 
 model:
-  weights_file_path: ../run_info/06_ResNet18_kitti_depth_estimation_input_reconstruction/best_model.pth
+  weights_file_path: ../run_info/06_ResNet18_kitti_rebalanced_depth_estimation_input_reconstruction/best_model.pth
   encoder:
     name: ResNet18
     freeze_epoch: 0
