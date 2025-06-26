@@ -2,14 +2,19 @@ device: cuda
 dataset:
   dataset_name: NuScenesNuImagesDataset
   tasks: [input, depth, road_detection, object_detection]
-  version: v1.0-mini
-  nuscenes_kitti_dataroot: ./data/nuscenes_kitti/mini_train
+  # NuScenes
+  nuscenes_kitti_dataroot: ./data/nuscenes_kitti # Inside shared/utils.py based on which script is ran train/val the data is then loaded
+  # NuImages
+  version: v1.0 # Inside shared/utils.py based on which script is ran train/val the data is then loaded
   nuimages_dataroot: ./data/nuscenes/nuimages
+  # Shared
+  num_samples_train: 6000
+  num_samples_val: 600
 
 train:
   dataloader:
     batch_size: 1
-    shuffle: False
+    shuffle: True
     num_workers: 1
 
 early_stopping:
@@ -19,7 +24,7 @@ early_stopping:
 epochs: 100
 
 model:
-  weights_file_path: ../run_info/01_ResNet18_kitti_depth_input_reconstruction_pretrained_road_detection_object_detection/best_model.pth
+  weights_file_path: ../run_info/07_ResNet18_kitti_rebalanced_depth_input_reconstruction_pretrained_road_detection_object_detection/best_model.pth
   encoder:
     name: ResNet18
     freeze_epoch: 0
@@ -67,7 +72,7 @@ model:
       - iou_threshold: 0.7
       - pre_nms_filtering: 8000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
       - top_k_proposals_training: 512 # per fpn layer
-      - top_k_proposals_testing: 16 # per fpn layer
+      - top_k_proposals_testing: 32 # per fpn layer
       - anchor_generator:
         - sizes: [[64], [128], [256], [512]]
         - aspect_ratios: [0.5, 1, 2]

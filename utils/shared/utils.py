@@ -2,6 +2,7 @@ import os
 import re
 import pathlib
 import logging
+import copy
 import yaml
 from typing import Any
 from collections import defaultdict
@@ -136,15 +137,27 @@ def prepare_save_directories(args: dict, subfolder_name="train") -> None:
 
 
 def configure_dataset(dataset_configs: dict[str, str | list], mode: str) -> Dataset:
+    dataset_configs_copied = copy.deepcopy(dataset_configs)
     dataset_dict = {
         KittiDataset.__name__: KittiDataset,
         NuScenesNuImagesDataset.__name__: NuScenesNuImagesDataset,
     }
-    if dataset_configs["dataset_name"] == KittiDataset.__name__:
-        dataset_configs["task_sample_list_path"] = dataset_configs.get(
+    if dataset_configs_copied["dataset_name"] == KittiDataset.__name__:
+        dataset_configs_copied["task_sample_list_path"] = dataset_configs_copied.get(
             f"task_sample_list_path_{mode}"
         )
-    return dataset_dict[dataset_configs["dataset_name"]](**dataset_configs)
+    elif dataset_configs_copied["dataset_name"] == NuScenesNuImagesDataset.__name__:
+        version = f"{dataset_configs_copied["version"]}-{mode}"
+        nuscenes_kitti_dataroot = (
+            f"{dataset_configs_copied["nuscenes_kitti_dataroot"]}/{mode}"
+        )
+        dataset_configs_copied["version"] = version
+        dataset_configs_copied["nuscenes_kitti_dataroot"] = nuscenes_kitti_dataroot
+        dataset_configs_copied["mode"] = mode
+
+    return dataset_dict[dataset_configs_copied["dataset_name"]](
+        **dataset_configs_copied
+    )
 
 
 def configure_dataloader(

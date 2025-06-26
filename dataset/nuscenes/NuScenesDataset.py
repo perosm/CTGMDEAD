@@ -27,6 +27,9 @@ class NuScenesNuImagesDataset(Dataset):
         version: str = "v1.0-mini",
         nuscenes_kitti_dataroot: str = "./data/nuscenes_kitti/mini_train",
         nuimages_dataroot: str = "./data/nuscenes/nuimages",
+        num_samples_train: int = 6000,
+        num_samples_val: int = 500,
+        mode: str = "train",
         **kwargs,
     ):
         """
@@ -39,6 +42,9 @@ class NuScenesNuImagesDataset(Dataset):
             version: Dataset version (used for NuImages loader instancing).
             nuscenes_kitti_dataroot: Dataset root of images, calibrations, object detection labels and velodyne pointcloud.
             nuimages_dataroot: Root folder where nuimages data is stored.
+            num_samples_train: Integer representing the number of samples used for training.
+            num_samples_val: Integer representing the number of samples used for validation.
+            mode: String representing mode (i.e. train or val)
         """
         super().__init__()
         self.tasks = tasks
@@ -48,6 +54,9 @@ class NuScenesNuImagesDataset(Dataset):
         self.nuimages = NuImages(
             version=version, dataroot=nuimages_dataroot, verbose=False, lazy=True
         )  # TODO: change verbose=False
+        self.num_samples_train = num_samples_train
+        self.num_samples_val = num_samples_val
+        self.mode = mode
 
         self.nuscenes_sample_list = self._read_nuscenes_sample_list()
         self.nuimages_sample_list = self._read_nuimages_sample_list()
@@ -81,11 +90,16 @@ class NuScenesNuImagesDataset(Dataset):
             ]
         )
 
-        return sample_list
+        return (
+            sample_list[: self.num_samples_train]
+            if self.mode == "train"
+            else sample_list[: self.num_samples_val]
+        )
 
     def _read_nuimages_sample_list(self) -> list[str]:
         """
         Sample list for NuImages is shared for the tasks of:
+            - input
             - road detection
 
         Returns:
@@ -105,7 +119,11 @@ class NuScenesNuImagesDataset(Dataset):
         # for sample_record in self.nuimages.sample:
         #     sample_list_2.append(sample_record["token"])
 
-        return sample_list
+        return (
+            sample_list[: self.num_samples_train]
+            if self.mode == "train"
+            else sample_list[: self.num_samples_val]
+        )
 
     @staticmethod
     def _read_input(filepath: pathlib.Path) -> torch.Tensor:
