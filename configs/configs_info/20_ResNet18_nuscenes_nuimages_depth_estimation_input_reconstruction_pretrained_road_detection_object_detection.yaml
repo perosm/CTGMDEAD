@@ -24,7 +24,7 @@ early_stopping:
 epochs: 100
 
 model:
-  weights_file_path: ../run_info/07_ResNet18_kitti_rebalanced_depth_input_reconstruction_pretrained_road_detection_object_detection/best_model.pth
+  weights_file_path: ../run_info/12_ResNet18_kitti_rebalanced_depth_input_reconstruction_pretrained_road_detection_object_detection_more_proposals_per_layer/best_model.pth
   encoder:
     name: ResNet18
     freeze_epoch: 0
@@ -114,12 +114,12 @@ prediction_postprocess: # used only in eval
   - object_detection: # None
 
 loss:
-  # input:
-  #   - MSE:
-  #     - scale_factor: 1
-  # depth: 
-  #   - MaskedMAE:
-  #     - scale_factor: 1
+  input:
+    - MSE:
+      - scale_factor: 1
+  depth: 
+    - MaskedMAE:
+      - scale_factor: 1
   road_detection:
     - BinaryCrossEntropyLoss:
       - scale_factor: 1

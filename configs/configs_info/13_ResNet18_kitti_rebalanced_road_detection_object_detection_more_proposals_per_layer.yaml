@@ -1,15 +1,25 @@
+# 07_ResNet18_kitti_rebalanced_depth_input_reconstruction_pretrained_road_detection_object_detection + MORE PROPOSALS
 device: cuda
 dataset:
-  dataset_name: NuScenesNuImagesDataset
-  tasks: [input, road_detection, object_detection]
-  # NuScenes
-  nuscenes_kitti_dataroot: ./data/nuscenes_kitti # Inside shared/utils.py based on which script is ran train/val the data is then loaded
-  # NuImages
-  version: v1.0 # Inside shared/utils.py based on which script is ran train/val the data is then loaded
-  nuimages_dataroot: ./data/nuscenes/nuimages
-  # Shared
-  num_samples_train: 6000
-  num_samples_val: 500
+  dataset_name: KittiDataset
+  co_train: True # set to True since non overlapping examples do exist
+  task_transform:
+    input: 
+      - Crop
+      - Divide
+    road_detection:
+      - Crop
+    object_detection:
+  task_paths:
+    input: "./data/kitti/input" # "../../datasets/kitti_data/"
+    road_detection: "./data/kitti/semantic_segmentation"
+    object_detection: "./data/kitti/object_detection/ground_truth"
+  task_sample_list_path_train:
+    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
+    object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"
+  task_sample_list_path_val:
+    road_detection: "./data/kitti/sample_lists/val/semseg_sample_list.txt"
+    object_detection: "./data/kitti/sample_lists/val/objdet_sample_list.txt"
 
 train:
   dataloader:
@@ -24,7 +34,7 @@ early_stopping:
 epochs: 100
 
 model:
-  weights_file_path: ../run_info/13_ResNet18_kitti_rebalanced_road_detection_object_detection_more_proposals_per_layer/best_model.pth
+  weights_file_path: # We don't load the pretrained weights
   encoder:
     name: ResNet18
     freeze_epoch: 0
@@ -38,7 +48,6 @@ model:
     main_decoder: True
     freeze_epoch: -1
     unfreeze_epoch: 0
-    pretrained_regex: ["*"]
   depth_decoder:
     name: UnetDepthDecoder
     in_channels: 512
@@ -55,10 +64,9 @@ model:
     out_channels: 1
     freeze_epoch: -1
     unfreeze_epoch: 0
-    pretrained_regex: ["*"]
   heads_and_necks:
     name: FPNFasterRCNN
-    image_size: [896, 1600]
+    image_size: [256, 1184]
     pool_output_size: [7, 7] # shared between RoI and output heads
     feature_map_names: ["fpn0", "fpn1", "fpn2", "fpn3"]
     num_channels_per_feature_map: [64, 64, 128, 256]
@@ -66,11 +74,10 @@ model:
     probability_threshold: 0.1
     iou_threshold: 0.5
     num_classes: 4 # number of classes we are trying to predict + background
-    pretrained_regex: ["*"]
     rpn:
       - objectness_threshold: 0.5
       - iou_threshold: 0.7
-      - pre_nms_filtering: 8000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
+      - pre_nms_filtering: 6000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
       - top_k_proposals_training: 512 # per fpn layer
       - top_k_proposals_testing: 32 # per fpn layer
       - anchor_generator:
@@ -109,36 +116,30 @@ prediction_postprocess: # used only in eval
   - input: # None
   - depth:
     - min_depth: 0.0
-    - max_depth: 255.0
+    - max_depth: 90.0
   - road_detection: # None
   - object_detection: # None
 
 loss:
-  # input:
-  #   - MSE:
-  #     - scale_factor: 1
-  # depth: 
-  #   - MaskedMAE:
-  #     - scale_factor: 1
   road_detection:
     - BinaryCrossEntropyLoss:
-      - scale_factor: 1
+      - scale_factor: 3.5
   object_detection: 
     - RPNClassificationAndRegressionLoss:
-      - scale_factor: 1
+      - scale_factor: 1.0
     - RCNNCrossEntropyAndRegressionLoss:
-      - scale_factor: 1
+      - scale_factor: 2.0
     - UncertaintyAwareRegressionLoss:
-      - scale_factor: 1
+      - scale_factor: 4.5
       - lambda_H: 1
       - lambda_h_rec: 1
       - iou_positive_threshold: 0.5
     - L1SizeLoss:
-      - scale_factor: 1
+      - scale_factor: 2.0
     - L1YawLoss:
-      - scale_factor: 1
+      - scale_factor: 2.5
     - L1KeypointsLoss:
-      - scale_factor: 1
+      - scale_factor: 1.0
 
 optimizer:
   name: Adam
@@ -147,7 +148,7 @@ optimizer:
 eval:
   dataloader:
     batch_size: 1
-    shuffle: False
+    shuffle: True
     num_workers: 1
 
 metrics:
