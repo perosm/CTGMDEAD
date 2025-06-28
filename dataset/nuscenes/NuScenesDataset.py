@@ -12,6 +12,7 @@ from utils.shared.enums import TaskEnum, ObjectDetectionEnum
 from PIL import Image
 from dataset.nuscenes import dataset_utils as NuScenesNuImagesUtils
 from utils.object_detection_3d import utils as ObjectDetection3DUtils
+from torchvision.ops import clip_boxes_to_image
 
 
 class NuScenesNuImagesDataset(Dataset):
@@ -24,8 +25,8 @@ class NuScenesNuImagesDataset(Dataset):
             TaskEnum.object_detection,
             TaskEnum.road_detection,
         ],
-        version: str = "v1.0-mini",
-        nuscenes_kitti_dataroot: str = "./data/nuscenes_kitti/mini_train",
+        version: str = "v1.0-train",
+        nuscenes_kitti_dataroot: str = "./data/nuscenes_kitti/train",
         nuimages_dataroot: str = "./data/nuscenes/nuimages",
         num_samples_train: int = 6000,
         num_samples_val: int = 500,
@@ -42,14 +43,14 @@ class NuScenesNuImagesDataset(Dataset):
             version: Dataset version (used for NuImages loader instancing).
             nuscenes_kitti_dataroot: Dataset root of images, calibrations, object detection labels and velodyne pointcloud.
             nuimages_dataroot: Root folder where nuimages data is stored.
-            num_samples_train: Integer representing the number of samples used for training.
-            num_samples_val: Integer representing the number of samples used for validation.
+            num_samples_train: Integer representing the number of samples used for training * 2.
+            num_samples_val: Integer representing the number of samples used for validation * 2.
             mode: String representing mode (i.e. train or val)
         """
         super().__init__()
         self.tasks = tasks
         self.nuscenes_kitti_root = pathlib.Path(nuscenes_kitti_dataroot)
-        self.nuimages_task_dataroot = self._fetch_task_dataroot()
+        self.nuscenes_task_dataroot = self._fetch_task_dataroot()
         self.nuimages_dataroot = pathlib.Path(nuimages_dataroot)
         self.nuimages = NuImages(
             version=version, dataroot=nuimages_dataroot, verbose=False, lazy=True
@@ -106,7 +107,7 @@ class NuScenesNuImagesDataset(Dataset):
             NuScenes sample list as a list of scene tokens.
         """
         sample_list = []
-        sample_list_2 = []
+
         for surface_ann in self.nuimages.surface_ann:
             sample_data_token = surface_ann["sample_data_token"]
             category_token = surface_ann["category_token"]
@@ -115,9 +116,6 @@ class NuScenesNuImagesDataset(Dataset):
             if category_name == "flat.driveable_surface":
                 sample_data = self.nuimages.get("sample_data", sample_data_token)
                 sample_list.append(sample_data["sample_token"])
-
-        # for sample_record in self.nuimages.sample:
-        #     sample_list_2.append(sample_record["token"])
 
         return (
             sample_list[: self.num_samples_train]
@@ -276,39 +274,19 @@ class NuScenesNuImagesDataset(Dataset):
                 object_index,
                 ObjectDetectionEnum.height : ObjectDetectionEnum.rotation_y + 1,
             ] = [float(world_coord) for world_coord in object_info[8:15]]
-            if NuScenesNuImagesDataset._is_in_bounds(gt[object_index]):
-                objects_to_keep.append(object_index)
+            objects_to_keep.append(object_index)
 
+        gt_objects = torch.from_numpy(gt[objects_to_keep])
+        gt_objects[
+            :, ObjectDetectionEnum.box_2d_left : ObjectDetectionEnum.box_2d_bottom + 1
+        ] = clip_boxes_to_image(
+            gt_objects[
+                :,
+                ObjectDetectionEnum.box_2d_left : ObjectDetectionEnum.box_2d_bottom + 1,
+            ],
+            size=NuScenesNuImagesUtils.IMAGE_SIZE,
+        )
         return torch.from_numpy(gt[objects_to_keep])
-
-    @staticmethod
-    def _is_in_bounds(object_detection_gt: np.ndarray) -> bool:
-        if (
-            object_detection_gt[ObjectDetectionEnum.box_2d_left] < 0
-            or object_detection_gt[ObjectDetectionEnum.box_2d_left]
-            >= NuScenesNuImagesUtils.NEW_W
-        ):
-            return False
-        if (
-            object_detection_gt[ObjectDetectionEnum.box_2d_top] < 0
-            or object_detection_gt[ObjectDetectionEnum.box_2d_top]
-            >= NuScenesNuImagesUtils.NEW_H
-        ):
-            return False
-        if (
-            object_detection_gt[ObjectDetectionEnum.box_2d_right] < 0
-            or object_detection_gt[ObjectDetectionEnum.box_2d_right]
-            >= NuScenesNuImagesUtils.NEW_W
-        ):
-            return False
-        if (
-            object_detection_gt[ObjectDetectionEnum.box_2d_bottom] < 0
-            or object_detection_gt[ObjectDetectionEnum.box_2d_bottom]
-            >= NuScenesNuImagesUtils.NEW_H
-        ):
-            return False
-
-        return True
 
     def __len__(self) -> int:
         return len(self.sample_list)
@@ -318,7 +296,7 @@ class NuScenesNuImagesDataset(Dataset):
         sample_token = self.sample_list[index]
         for task in self.tasks:
             filepath = (
-                self.nuimages_task_dataroot[task]
+                self.nuscenes_task_dataroot[task]
                 / f"{sample_token}.{NuScenesNuImagesUtils.TASK_FILE_EXTENSION[task]}"
             )
             if filepath.exists():  # depth, object_detection
@@ -400,4 +378,7 @@ if __name__ == "__main__":
     dataset = NuScenesNuImagesDataset()
 
     for sample_idx, data in enumerate(tqdm(dataset, "Loading samples...")):
-        print("Sample idx: ", sample_idx)
+        print("Sample idx: ", data[TaskEnum.object_detection]["gt_info"].shape)
+        if data[TaskEnum.object_detection]["gt_info"].shape[0] == 0:
+            plt.imshow(data[TaskEnum.input].permute(1, 2, 0).numpy())
+            plt.show()
