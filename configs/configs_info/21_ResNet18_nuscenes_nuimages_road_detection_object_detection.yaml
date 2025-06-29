@@ -8,8 +8,8 @@ dataset:
   version: v1.0 # Inside shared/utils.py based on which script is ran train/val the data is then loaded
   nuimages_dataroot: ./data/nuscenes/nuimages
   # Shared
-  num_samples_train: 6000
-  num_samples_val: 500
+  num_samples_train: 4000
+  num_samples_val: 400
 
 train:
   dataloader:
