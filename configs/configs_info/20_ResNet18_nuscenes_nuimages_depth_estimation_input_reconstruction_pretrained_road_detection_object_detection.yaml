@@ -147,7 +147,7 @@ optimizer:
 eval:
   dataloader:
     batch_size: 1
-    shuffle: False
+    shuffle: True
     num_workers: 1
 
 metrics:
