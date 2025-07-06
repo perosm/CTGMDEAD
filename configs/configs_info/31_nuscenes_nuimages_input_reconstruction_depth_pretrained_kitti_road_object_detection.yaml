@@ -1,0 +1,172 @@
+device: cuda
+dataset:
+  dataset_name: KittiDataset
+  co_train: True # set to True since non overlapping examples do exist
+  task_transform:
+    input: 
+      - Crop
+      - Divide
+    road_detection:
+      - Crop
+    object_detection:
+  task_paths:
+    input: "./data/kitti/input" # "../../datasets/kitti_data/"
+    road_detection: "./data/kitti/semantic_segmentation"
+    object_detection: "./data/kitti/object_detection/ground_truth"
+  task_sample_list_path_train:
+    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
+    object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"
+  task_sample_list_path_val:
+    road_detection: "./data/kitti/sample_lists/val/semseg_sample_list.txt"
+    object_detection: "./data/kitti/sample_lists/val/objdet_sample_list.txt"
+
+train:
+  dataloader:
+    batch_size: 1
+    shuffle: True
+    num_workers: 1
+
+early_stopping:
+  patience: 5
+  min_delta: 0.01
+
+epochs: 100
+
+model:
+  weights_file_path:  ../run_info/30_nuscenes_nuimages_input_reconstruction_depth/best_model.pth
+  encoder:
+    name: ResNet18
+    freeze_epoch: 0
+    unfreeze_epoch: -1
+  input_reconstruction_decoder:
+    name: UnetInputReconstructionDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 3
+    main_decoder: True
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+  depth_decoder:
+    name: UnetDepthDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    main_decoder: False
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+  road_detection_decoder:
+    name: UnetRoadDetectionDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+  heads_and_necks:
+    name: FPNFasterRCNN
+    image_size: [256, 1184]
+    pool_output_size: [7, 7] # shared between RoI and output heads
+    feature_map_names: ["fpn0", "fpn1", "fpn2", "fpn3"]
+    num_channels_per_feature_map: [64, 64, 128, 256]
+    out_channels: 256
+    probability_threshold: 0.1
+    iou_threshold: 0.5
+    num_classes: 4 # number of classes we are trying to predict + background
+    rpn:
+      - objectness_threshold: 0.5
+      - iou_threshold: 0.7
+      - pre_nms_filtering: 8000 # TODO: check https://github.com/open-mmlab/mmdetection/issues/300
+      - top_k_proposals_training: 512 # per fpn layer
+      - top_k_proposals_testing: 32 # per fpn layer
+      - anchor_generator:
+        - sizes: [[64], [128], [256], [512]]
+        - aspect_ratios: [0.5, 1, 2]
+      - rpn_head:
+        - number_of_object_proposals_per_anchor: 3
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
+    roi:
+      - sampling_ratio: 4
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
+    output_heads:
+      - score_threshold: 0.3
+      - top_k_boxes_training: 256
+      - top_k_boxes_testing: 2
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
+    distance_head:
+      - num_conv_layers: 1
+      - num_channels: 256
+      - num_fc_layers: 2
+      - fc_features: 1024
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
+    attribute_head:
+      - num_conv_layers: 1
+      - num_channels: 256
+      - num_fc_layers: 2
+      - fc_features: 1024
+      - freeze_epoch: -1
+      - unfreeze_epoch: 0
+
+prediction_postprocess: # used only in eval
+  - input: # None
+  - depth:
+    - min_depth: 0.0
+    - max_depth: 90.0
+  - road_detection: # None
+  - object_detection: # None
+
+loss:
+  road_detection:
+    - BinaryCrossEntropyLoss:
+      - scale_factor: 1
+  object_detection: 
+    - RPNClassificationAndRegressionLoss:
+      - scale_factor: 1
+    - RCNNCrossEntropyAndRegressionLoss:
+      - scale_factor: 1
+    - UncertaintyAwareRegressionLoss:
+      - scale_factor: 1
+      - lambda_H: 1
+      - lambda_h_rec: 1
+      - iou_positive_threshold: 0.5
+    - L1SizeLoss:
+      - scale_factor: 1
+    - L1YawLoss:
+      - scale_factor: 1
+    - L1KeypointsLoss:
+      - scale_factor: 1
+
+optimizer:
+  name: Adam
+  lr: 1e-5
+
+eval:
+  dataloader:
+    batch_size: 1
+    shuffle: True
+    num_workers: 1
+
+metrics:
+  input:
+    - MSE
+    # - SSIM # TODO: implement SSIM
+  depth:
+    - MaskedMAE
+    - MaskedAverageRelativeError
+    - MaskedRMSE
+    - MaskedThresholdAccracy
+  road_detection:
+    - IoU
+    - Precision
+    - Recall
+    - FalsePositiveRate
+    - TrueNegativeRate
+    - F1Score
+  object_detection:
+    - mAP
+    - mAP_BEV
+    - mAP_3D
+
+save_path: ../run_info/

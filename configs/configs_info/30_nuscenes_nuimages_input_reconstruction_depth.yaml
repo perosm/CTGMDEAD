@@ -1,0 +1,86 @@
+device: cuda
+dataset:
+  dataset_name: NuScenesNuImagesDataset
+  tasks: [input, depth]
+  # NuScenes
+  nuscenes_kitti_dataroot: ./data/nuscenes_kitti # Inside shared/utils.py based on which script is ran train/val the data is then loaded
+  # NuImages
+  version: v1.0 # Inside shared/utils.py based on which script is ran train/val the data is then loaded
+  nuimages_dataroot: ./data/nuscenes/nuimages
+  # Shared
+  num_samples_train: 20000 # This will amount to ~ 30k samples
+  num_samples_val: 1500 # This will amount to ~ 3k samples
+
+train:
+  dataloader:
+    batch_size: 16
+    shuffle: True
+    num_workers: 1
+
+early_stopping:
+  patience: 5
+  min_delta: 0.01
+
+epochs: 100
+
+model:
+  weights_file_path: # None
+  encoder:
+    name: ResNet18
+    freeze_epoch: 0
+    unfreeze_epoch: -1
+    pretrained_regex: # None
+  input_reconstruction_decoder:
+    name: UnetInputReconstructionDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 3
+    main_decoder: True
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+    pretrained_regex: # None
+  depth_decoder:
+    name: UnetDepthDecoder
+    in_channels: 512
+    channel_scale_factors: [2, 4, 8, 8]
+    out_channels: 1
+    main_decoder: False
+    freeze_epoch: -1
+    unfreeze_epoch: 0
+    pretrained_regex: # None
+
+prediction_postprocess: # used only in eval
+  - input: # None
+  - depth:
+    - min_depth: 0.0
+    - max_depth: 255.0
+
+loss:
+  input:
+    - MSE:
+      - scale_factor: 1
+  depth: 
+    - MaskedMAE:
+      - scale_factor: 1
+
+optimizer:
+  name: Adam
+  lr: 1e-5
+
+eval:
+  dataloader:
+    batch_size: 1
+    shuffle: True
+    num_workers: 1
+
+metrics:
+  input:
+    - MSE
+    # - SSIM # TODO: implement SSIM
+  depth:
+    - MaskedMAE
+    - MaskedAverageRelativeError
+    - MaskedRMSE
+    - MaskedThresholdAccracy
+
+save_path: ../run_info/
