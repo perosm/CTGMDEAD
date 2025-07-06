@@ -354,7 +354,9 @@ class NuScenesNuImagesDataset(Dataset):
                     projection_matrix[:3, :3] = np.array(
                         calibrated_sensor_data["camera_intrinsic"]
                     ).reshape(3, 3)
-                    data["projection_matrix"] = torch.from_numpy(projection_matrix)
+                    data["projection_matrix"] = torch.from_numpy(projection_matrix)[
+                        :3, :
+                    ]
                 if task == TaskEnum.road_detection:
                     semantic_mask, _ = self.nuimages.get_segmentation(key_camera_token)
                     road_mask = np.where(
