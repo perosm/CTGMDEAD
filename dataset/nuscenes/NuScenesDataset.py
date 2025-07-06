@@ -137,7 +137,7 @@ class NuScenesNuImagesDataset(Dataset):
         if not filepath.exists():
             return torch.fill_(
                 torch.empty(
-                    (3, NuScenesNuImagesUtils.NEW_H, NuScenesNuImagesUtils.NEW_W)
+                    (1, NuScenesNuImagesUtils.NEW_H, NuScenesNuImagesUtils.NEW_W)
                 ),
                 torch.nan,
             )
@@ -357,13 +357,19 @@ class NuScenesNuImagesDataset(Dataset):
                         self.nuimages.dataroot, sample_data["filename"]
                     )
                     data[task] = NuScenesNuImagesDataset._read_input(filepath)
-                    projection_matrix = np.eye(4)
-                    projection_matrix[:3, :3] = np.array(
+                    projection_matrix = np.array(
                         calibrated_sensor_data["camera_intrinsic"]
                     ).reshape(3, 3)
-                    data["projection_matrix"] = torch.from_numpy(projection_matrix)[
-                        :3, :
-                    ]
+                    projection_matrix = np.concatenate(
+                        (projection_matrix, np.zeros((3, 1))), axis=1
+                    )
+                    projection_matrix[
+                        0, 2
+                    ] -= NuScenesNuImagesUtils.DELTA_PRINCIPAL_POINT_X
+                    projection_matrix[
+                        1, 2
+                    ] -= NuScenesNuImagesUtils.DELTA_PRINCIPAL_POINT_Y
+                    data["projection_matrix"] = torch.from_numpy(projection_matrix)
                 elif task == TaskEnum.depth:
                     data[task] = NuScenesNuImagesDataset._read_depth(filepath=filepath)
                 elif task == TaskEnum.road_detection:
@@ -386,10 +392,17 @@ class NuScenesNuImagesDataset(Dataset):
 if __name__ == "__main__":
     from tqdm import tqdm
 
-    dataset = NuScenesNuImagesDataset()
-
-    for sample_idx, data in enumerate(tqdm(dataset, "Loading samples...")):
-        print("Sample idx: ", data[TaskEnum.object_detection]["gt_info"].shape)
-        if data[TaskEnum.object_detection]["gt_info"].shape[0] == 0:
-            plt.imshow(data[TaskEnum.input].permute(1, 2, 0).numpy())
-            plt.show()
+    dataset = NuScenesNuImagesDataset(tasks=["input", "depth"])
+    dataloder = torch.utils.data.DataLoader(
+        dataset=dataset,
+        batch_size=2,
+        shuffle=True,
+        num_workers=1,
+    )
+    for data in dataloder:
+        print(data)
+    # for sample_idx, data in enumerate(tqdm(dataset, "Loading samples...")):
+    #     print("Sample idx: ", data[TaskEnum.object_detection]["gt_info"].shape)
+    #     if data[TaskEnum.object_detection]["gt_info"].shape[0] == 0:
+    #         plt.imshow(data[TaskEnum.input].permute(1, 2, 0).numpy())
+    #         plt.show()
