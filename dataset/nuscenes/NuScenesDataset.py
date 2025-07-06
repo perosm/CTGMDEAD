@@ -357,7 +357,9 @@ class NuScenesNuImagesDataset(Dataset):
                     data["projection_matrix"] = torch.from_numpy(projection_matrix)[
                         :3, :
                     ]
-                if task == TaskEnum.road_detection:
+                elif task == TaskEnum.depth:
+                    data[task] = NuScenesNuImagesDataset._read_depth(filepath=filepath)
+                elif task == TaskEnum.road_detection:
                     semantic_mask, _ = self.nuimages.get_segmentation(key_camera_token)
                     road_mask = np.where(
                         semantic_mask
