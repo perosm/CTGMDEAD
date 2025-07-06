@@ -134,6 +134,13 @@ class NuScenesNuImagesDataset(Dataset):
 
     @staticmethod
     def _read_depth(filepath: pathlib.Path) -> torch.Tensor:
+        if not filepath.exists():
+            return torch.fill_(
+                torch.empty(
+                    (3, NuScenesNuImagesUtils.NEW_H, NuScenesNuImagesUtils.NEW_W)
+                ),
+                torch.nan,
+            )
         pcl = np.fromfile(filepath, dtype=np.float32).reshape(-1, 4)
 
         # Transform pointcloud to camera frame.
