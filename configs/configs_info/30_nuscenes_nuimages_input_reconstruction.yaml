@@ -1,7 +1,7 @@
 device: cuda
 dataset:
   dataset_name: NuScenesNuImagesDataset
-  tasks: [input, depth]
+  tasks: [input]
   # NuScenes
   nuscenes_kitti_dataroot: ./data/nuscenes_kitti # Inside shared/utils.py based on which script is ran train/val the data is then loaded
   # NuImages
@@ -51,16 +51,10 @@ model:
 
 prediction_postprocess: # used only in eval
   - input: # None
-  - depth:
-    - min_depth: 0.0
-    - max_depth: 255.0
 
 loss:
   input:
     - MSE:
-      - scale_factor: 1
-  depth: 
-    - MaskedMAE:
       - scale_factor: 1
 
 optimizer:

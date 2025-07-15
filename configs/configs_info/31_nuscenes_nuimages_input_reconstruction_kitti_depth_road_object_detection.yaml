@@ -6,6 +6,8 @@ dataset:
     input: 
       - Crop
       - Divide
+    depth:
+      - Crop
     road_detection:
       - Crop
     object_detection:
@@ -118,6 +120,9 @@ prediction_postprocess: # used only in eval
   - object_detection: # None
 
 loss:
+  depth: 
+    - MaskedMAE:
+      - scale_factor: 1
   road_detection:
     - BinaryCrossEntropyLoss:
       - scale_factor: 1
