@@ -1,7 +1,7 @@
 import os
 import abc
 import pathlib
-import json
+import yaml
 
 from utils.shared.aggregators.MetricsAggregator import MetricsAggregator
 from utils.shared.savers.Saver import Saver
@@ -23,5 +23,5 @@ class MetricsSaver(Saver):
 
     def save(self) -> None:
         per_task_metrics = self.aggregator.return_aggregated()
-        with open(self.save_dir / f"{self.name}.json", "w") as f:
-            json.dump(per_task_metrics, f)
+        with open(self.save_dir / f"{self.name}.yaml", "w") as f:
+            yaml.dump(per_task_metrics, f)

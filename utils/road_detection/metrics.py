@@ -106,4 +106,9 @@ class F1Score(nn.Module):
         fn = (~pred & gt).sum()
         precision = tp / (tp + fp + self.epsilon)
         recall = tp / (tp + fn + self.epsilon)
-        return 2 * precision * recall / (precision + recall)
+        numerator = 2 * precision * recall
+        denominator = precision + recall
+        if denominator == 0:
+            return torch.tensor(0.0, device=pred.device)
+
+        return numerator / denominator
