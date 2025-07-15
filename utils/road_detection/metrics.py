@@ -34,7 +34,7 @@ class Precision(nn.Module):
         tp = (pred & gt).sum()
         fp = (pred & ~gt).sum()
 
-        return tp / (tp + fp + self.epsilon)
+        return tp / (tp + fp)
 
 
 class Recall(nn.Module):
@@ -52,7 +52,7 @@ class Recall(nn.Module):
         tp = (pred & gt).sum()
         fn = (~pred & gt).sum()
 
-        return tp / (tp + fn + self.epsilon)
+        return tp / (tp + fn)
 
 
 class FalsePositiveRate(nn.Module):
@@ -104,8 +104,8 @@ class F1Score(nn.Module):
         tp = (pred & gt).sum()
         fp = (pred & ~gt).sum()
         fn = (~pred & gt).sum()
-        precision = tp / (tp + fp + self.epsilon)
-        recall = tp / (tp + fn + self.epsilon)
+        precision = tp / (tp + fp)
+        recall = tp / (tp + fn)
         numerator = 2 * precision * recall
         denominator = precision + recall
         if denominator == 0:
