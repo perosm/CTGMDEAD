@@ -120,6 +120,9 @@ prediction_postprocess: # used only in eval
   - object_detection: # None
 
 loss:
+  input:
+    - MSE: 
+      - scale_factor: 1
   depth: 
     - MaskedMAE:
       - scale_factor: 1
