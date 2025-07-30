@@ -1,26 +1,15 @@
 device: cuda
 dataset:
-  dataset_name: KittiDataset
-  co_train: True # set to True since non overlapping examples do exist
-  task_transform:
-    input: 
-      - Crop
-      - Divide
-    depth:
-      - Crop
-    road_detection:
-      - Crop
-    object_detection:
-  task_paths:
-    input: "./data/kitti/input" # "../../datasets/kitti_data/"
-    road_detection: "./data/kitti/semantic_segmentation"
-    object_detection: "./data/kitti/object_detection/ground_truth"
-  task_sample_list_path_train:
-    road_detection: "./data/kitti/sample_lists/train/semseg_sample_list.txt"
-    object_detection: "./data/kitti/sample_lists/train/objdet_sample_list.txt"
-  task_sample_list_path_val:
-    road_detection: "./data/kitti/sample_lists/val/semseg_sample_list.txt"
-    object_detection: "./data/kitti/sample_lists/val/objdet_sample_list.txt"
+  dataset_name: NuScenesNuImagesDataset
+  tasks: [input]
+  # NuScenes
+  nuscenes_kitti_dataroot: ./data/nuscenes_kitti # Inside shared/utils.py based on which script is ran train/val the data is then loaded
+  # NuImages
+  version: v1.0 # Inside shared/utils.py based on which script is ran train/val the data is then loaded
+  nuimages_dataroot: ./data/nuscenes/nuimages
+  # Shared
+  num_samples_train: 20000 # This will amount to ~ 30k samples
+  num_samples_val: 1500 # This will amount to ~ 3k samples
 
 train:
   dataloader:
